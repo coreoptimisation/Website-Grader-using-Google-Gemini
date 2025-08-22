@@ -1,0 +1,199 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Search, Plus, History, FileText, Settings, SearchCode } from "lucide-react";
+import ScanForm from "@/components/scan-form";
+import ScanProgress from "@/components/scan-progress";
+import PillarScores from "@/components/pillar-scores";
+import OverallScore from "@/components/overall-score";
+import Recommendations from "@/components/recommendations";
+import { Card } from "@/components/ui/card";
+import type { ScanData } from "@/lib/types";
+
+export default function Dashboard() {
+  const [activeScanId, setActiveScanId] = useState<string | null>(null);
+
+  const { data: recentScans } = useQuery({
+    queryKey: ['/api/scans'],
+    enabled: true
+  });
+
+  const { data: activeScanData, isLoading: scanLoading } = useQuery({
+    queryKey: ['/api/scans', activeScanId],
+    enabled: !!activeScanId,
+    refetchInterval: (data: any) => {
+      return data?.scan?.status === 'scanning' ? 2000 : false;
+    }
+  });
+
+  const handleScanStarted = (scanId: string) => {
+    setActiveScanId(scanId);
+  };
+
+  const isScanning = (activeScanData as any)?.scan?.status === 'scanning';
+  const isCompleted = (activeScanData as any)?.scan?.status === 'completed';
+
+  return (
+    <div className="min-h-screen flex">
+      {/* Sidebar Navigation */}
+      <aside className="w-64 bg-white shadow-sm border-r border-slate-200 flex flex-col" data-testid="sidebar">
+        <div className="p-6 border-b border-slate-200">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+              <SearchCode className="text-white h-5 w-5" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold text-slate-900">Website Grader</h1>
+              <p className="text-xs text-slate-500">AI-Powered Analysis</p>
+            </div>
+          </div>
+        </div>
+        
+        <nav className="flex-1 p-4">
+          <ul className="space-y-2">
+            <li>
+              <a 
+                href="#" 
+                className="flex items-center space-x-3 px-3 py-2 rounded-lg bg-primary text-white"
+                data-testid="nav-dashboard"
+              >
+                <Search className="w-5 h-5" />
+                <span>Dashboard</span>
+              </a>
+            </li>
+            <li>
+              <a 
+                href="#" 
+                className="flex items-center space-x-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100"
+                data-testid="nav-new-scan"
+              >
+                <Plus className="w-5 h-5" />
+                <span>New Scan</span>
+              </a>
+            </li>
+            <li>
+              <a 
+                href="#" 
+                className="flex items-center space-x-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100"
+                data-testid="nav-history"
+              >
+                <History className="w-5 h-5" />
+                <span>Scan History</span>
+              </a>
+            </li>
+            <li>
+              <a 
+                href="#" 
+                className="flex items-center space-x-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100"
+                data-testid="nav-reports"
+              >
+                <FileText className="w-5 h-5" />
+                <span>Reports</span>
+              </a>
+            </li>
+            <li>
+              <a 
+                href="#" 
+                className="flex items-center space-x-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100"
+                data-testid="nav-settings"
+              >
+                <Settings className="w-5 h-5" />
+                <span>Settings</span>
+              </a>
+            </li>
+          </ul>
+        </nav>
+        
+        <div className="p-4 border-t border-slate-200">
+          <div className="text-xs text-slate-500">
+            <p>EAA Compliant</p>
+            <p>Ireland-focused analysis</p>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 overflow-hidden">
+        {/* Header */}
+        <header className="bg-white border-b border-slate-200 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-900">Website Analysis Dashboard</h2>
+              <p className="text-sm text-slate-600">Comprehensive site grading across 4 key pillars</p>
+            </div>
+            <div className="flex items-center space-x-4">
+              <button 
+                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors"
+                data-testid="button-new-scan"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                New Scan
+              </button>
+              <div className="w-8 h-8 bg-slate-300 rounded-full" data-testid="user-avatar"></div>
+            </div>
+          </div>
+        </header>
+
+        {/* Content Area */}
+        <div className="p-6 overflow-y-auto h-full">
+          {/* URL Input Section */}
+          <ScanForm onScanStarted={handleScanStarted} />
+
+          {/* Current Scan Progress */}
+          {activeScanId && (isScanning || scanLoading) && (
+            <ScanProgress 
+              scanId={activeScanId} 
+              url={(activeScanData as any)?.scan?.url} 
+              status={(activeScanData as any)?.scan?.status}
+            />
+          )}
+
+          {/* Results Dashboard */}
+          {isCompleted && activeScanData && (
+            <>
+              <PillarScores results={(activeScanData as any).results} />
+              <OverallScore report={(activeScanData as any).report} results={(activeScanData as any).results} />
+              <Recommendations report={(activeScanData as any).report} />
+            </>
+          )}
+
+          {/* Recent Scans */}
+          {!activeScanId && (
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">Recent Scans</h3>
+              {recentScans && (recentScans as any).length > 0 ? (
+                <div className="space-y-3">
+                  {(recentScans as any).map((scan: ScanData) => (
+                    <div 
+                      key={scan.id} 
+                      className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer"
+                      onClick={() => setActiveScanId(scan.id)}
+                      data-testid={`scan-item-${scan.id}`}
+                    >
+                      <div>
+                        <p className="font-medium text-slate-900">{scan.url}</p>
+                        <p className="text-sm text-slate-500">
+                          {new Date(scan.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                        scan.status === 'completed' 
+                          ? 'bg-green-100 text-green-800' 
+                          : scan.status === 'failed'
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        {scan.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-slate-500">No recent scans. Start your first scan above.</p>
+              )}
+            </Card>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}
