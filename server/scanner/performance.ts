@@ -30,6 +30,13 @@ export async function runPerformanceAudit(url: string): Promise<PerformanceResul
       output: "json",
       onlyCategories: ["performance"],
       formFactor: "desktop",
+      screenEmulation: {
+        mobile: false,
+        width: 1920,
+        height: 1080,
+        deviceScaleFactor: 1,
+        disabled: false
+      },
       throttling: {
         rttMs: 40,
         throughputKbps: 10240,
