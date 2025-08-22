@@ -8,6 +8,9 @@ import PillarScores from "@/components/pillar-scores";
 import OverallScore from "@/components/overall-score";
 import Recommendations from "@/components/recommendations";
 import AccessibilityDetails from "@/components/accessibility-details";
+import AgentReadinessDetails from "@/components/agent-readiness-details";
+import PerformanceDetails from "@/components/performance-details";
+import TrustSecurityDetails from "@/components/trust-security-details";
 import { Card } from "@/components/ui/card";
 import type { ScanData } from "@/lib/types";
 
@@ -236,6 +239,15 @@ export default function Dashboard() {
                   <OverallScore report={(activeScanData as any).report} results={(activeScanData as any).results} />
                   <AccessibilityDetails 
                     rawData={(activeScanData as any).results?.find((r: any) => r.pillar === 'accessibility')?.rawData}
+                  />
+                  <TrustSecurityDetails
+                    rawData={(activeScanData as any).results?.find((r: any) => r.pillar === 'trust')?.rawData}
+                  />
+                  <PerformanceDetails
+                    rawData={(activeScanData as any).results?.find((r: any) => r.pillar === 'performance')?.rawData}
+                  />
+                  <AgentReadinessDetails
+                    rawData={(activeScanData as any).results?.find((r: any) => r.pillar === 'agentReadiness')?.rawData}
                   />
                   <Recommendations report={(activeScanData as any).report} />
                 </>
