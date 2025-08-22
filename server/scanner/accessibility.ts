@@ -20,7 +20,8 @@ export async function runAccessibilityAudit(url: string): Promise<AccessibilityR
   });
   
   try {
-    const page = await browser.newPage();
+    const context = await browser.newContext();
+    const page = await context.newPage();
     await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
     
     // Run axe-core accessibility audit

@@ -1,9 +1,10 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { calculateOverallScore, getGrade, getGradeExplanation, calculateTopFixes, PillarScores } from "../shared/scoring";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY || "");
 
 const model = genAI.getGenerativeModel({
-  model: "gemini-2.5-flash",
+  model: "gemini-2.0-flash-latest",
   generationConfig: {
     responseMimeType: "application/json",
     responseSchema: {
@@ -124,7 +125,31 @@ Provide a comprehensive analysis with:
 5. EAA compliance assessment where relevant
 6. Plain-English explanations suitable for Irish business owners
 
-Focus on actionable, specific recommendations with working code snippets for HTML/CSS/CSP/JSON-LD fixes.`;
+IMPORTANT CODE SNIPPET REQUIREMENTS:
+- For accessibility issues, provide complete HTML fixes with proper ARIA attributes
+- For CSP headers, provide complete Content-Security-Policy header examples
+- For JSON-LD, provide complete schema.org structured data examples including Organization, WebSite, and relevant types
+- For performance, provide specific CSS/JS optimization examples
+- All code snippets must be production-ready and copy-pasteable
+
+Example CSP header:
+Content-Security-Policy: default-src 'self'; img-src 'self' data: https:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'
+
+Example JSON-LD for Organization:
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Company Name",
+  "url": "${evidence.url}",
+  "logo": "${evidence.url}/logo.png",
+  "contactPoint": {
+    "@type": "ContactPoint",
+    "telephone": "+353-1-234-5678",
+    "contactType": "customer service"
+  }
+}
+
+For EAA compliance (European Accessibility Act - deadline June 28, 2025), map WCAG violations to EAA requirements where relevant. Note which violations are critical for EAA compliance.`;
 
   try {
     const result = await model.generateContent({ contents: [{ role: "user", parts: [{ text: prompt }] }] });

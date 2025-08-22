@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import * as xml2js from "xml2js";
 
 export interface AgentReadinessResult {
   score: number;
@@ -19,6 +20,7 @@ export interface AgentReadinessResult {
     microdata: any[];
     total: number;
     types: string[];
+    issues: string[];
   };
   canonical: {
     present: boolean;
@@ -137,6 +139,7 @@ async function checkSitemaps(baseUrl: string, robotsSitemaps: string[]) {
   const sitemapUrls = [...robotsSitemaps, `${baseUrl}/sitemap.xml`];
   let foundSitemaps = 0;
   const urls: string[] = [];
+  const parser = new xml2js.Parser();
   
   for (const sitemapUrl of sitemapUrls) {
     try {
@@ -144,10 +147,33 @@ async function checkSitemaps(baseUrl: string, robotsSitemaps: string[]) {
       if (response.ok) {
         foundSitemaps++;
         const content = await response.text();
-        // Basic XML parsing to count URLs
-        const urlMatches = content.match(/<loc>(.*?)<\/loc>/g);
-        if (urlMatches) {
-          urls.push(...urlMatches.map(match => match.replace(/<\/?loc>/g, '')));
+        try {
+          const result = await parser.parseStringPromise(content);
+          // Handle both sitemap index and urlset formats
+          if (result.sitemapindex?.sitemap) {
+            // This is a sitemap index, fetch child sitemaps
+            for (const sitemap of result.sitemapindex.sitemap) {
+              if (sitemap.loc?.[0]) {
+                const childResponse = await fetch(sitemap.loc[0]);
+                if (childResponse.ok) {
+                  const childContent = await childResponse.text();
+                  const childResult = await parser.parseStringPromise(childContent);
+                  if (childResult.urlset?.url) {
+                    urls.push(...childResult.urlset.url.map((u: any) => u.loc?.[0]).filter(Boolean));
+                  }
+                }
+              }
+            }
+          } else if (result.urlset?.url) {
+            // This is a regular urlset sitemap
+            urls.push(...result.urlset.url.map((u: any) => u.loc?.[0]).filter(Boolean));
+          }
+        } catch (parseError) {
+          // Fallback to regex if XML parsing fails
+          const urlMatches = content.match(/<loc>(.*?)<\/loc>/g);
+          if (urlMatches) {
+            urls.push(...urlMatches.map(match => match.replace(/<\/?loc>/g, '')));
+          }
         }
       }
     } catch (error) {
@@ -189,14 +215,41 @@ async function extractStructuredData(page: any) {
     return { jsonLd, microdata };
   });
   
-  const types = structuredData.jsonLd.map((item: any) => item['@type']).filter(Boolean);
+  const types = structuredData.jsonLd.map((item: any) => item['@type']).filter(Boolean).flat();
+  const issues: string[] = [];
+  
+  // Check for essential schema types
+  const hasOrganization = types.some((t: string) => t === 'Organization' || t === 'LocalBusiness');
+  const hasWebSite = types.some((t: string) => t === 'WebSite');
+  const hasWebPage = types.some((t: string) => t?.includes('Page'));
+  
+  if (!hasOrganization) {
+    issues.push('Missing Organization or LocalBusiness schema');
+  }
+  if (!hasWebSite) {
+    issues.push('Missing WebSite schema');
+  }
+  if (!hasWebPage) {
+    issues.push('Missing WebPage schema');
+  }
+  
+  // Validate JSON-LD structure
+  structuredData.jsonLd.forEach((item: any) => {
+    if (!item['@context']) {
+      issues.push('JSON-LD missing @context');
+    }
+    if (!item['@type']) {
+      issues.push('JSON-LD missing @type');
+    }
+  });
   
   return {
     structuredData: {
       jsonLd: structuredData.jsonLd,
       microdata: structuredData.microdata,
       total: structuredData.jsonLd.length + structuredData.microdata.length,
-      types
+      types,
+      issues
     }
   };
 }

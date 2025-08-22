@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { runCompleteScan } from "./scanner";
 import { analyzeWebsiteFindings } from "./gemini";
 import { z } from "zod";
+import { calculateOverallScore, getGrade, getGradeExplanation } from "../shared/scoring";
 
 const scanRequestSchema = z.object({
   url: z.string().url("Invalid URL format"),
@@ -96,8 +97,8 @@ async function processScan(scanId: string, url: string) {
     // Update status to scanning
     await storage.updateScanStatus(scanId, "scanning");
     
-    // Run complete scan
-    const evidence = await runCompleteScan(url);
+    // Run complete scan with screenshot capture
+    const evidence = await runCompleteScan(url, scanId);
     
     // Store evidence
     await storage.createScanEvidence({
@@ -153,29 +154,23 @@ async function processScan(scanId: string, url: string) {
       agentReadiness: evidence.agentReadiness
     });
 
-    // Calculate weighted overall score
-    const weights = {
-      accessibility: 0.40,
-      trust: 0.20,
-      uxPerf: 0.25,
-      agentReadiness: 0.15
-    };
-
-    const overallScore = Math.round(
-      (geminiAnalysis.pillarScores.accessibility * weights.accessibility) +
-      (geminiAnalysis.pillarScores.trust * weights.trust) +
-      (geminiAnalysis.pillarScores.uxPerf * weights.uxPerf) +
-      (geminiAnalysis.pillarScores.agentReadiness * weights.agentReadiness)
-    );
+    // Calculate weighted overall score using the shared scoring module
+    const overallScore = calculateOverallScore(geminiAnalysis.pillarScores);
+    const grade = getGrade(overallScore);
+    const gradeExplanation = getGradeExplanation(grade, overallScore);
 
     // Create scan report
     await storage.createScanReport({
       scanId,
       overallScore,
-      grade: geminiAnalysis.overallGrade,
+      grade,
       topFixes: geminiAnalysis.topFixes,
       summary: geminiAnalysis.summary,
-      geminiAnalysis
+      geminiAnalysis: {
+        ...geminiAnalysis,
+        overallGrade: grade,
+        gradeExplanation
+      }
     });
 
     // Mark scan as completed
