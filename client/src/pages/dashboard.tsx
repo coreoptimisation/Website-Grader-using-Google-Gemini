@@ -12,6 +12,7 @@ import type { ScanData } from "@/lib/types";
 
 export default function Dashboard() {
   const [activeScanId, setActiveScanId] = useState<string | null>(null);
+  const [currentView, setCurrentView] = useState<'dashboard' | 'history'>('dashboard');
 
   const { data: recentScans } = useQuery({
     queryKey: ['/api/scans'],
@@ -67,34 +68,41 @@ export default function Dashboard() {
         <nav className="flex-1 p-4">
           <ul className="space-y-2">
             <li>
-              <a 
-                href="#" 
-                className="flex items-center space-x-3 px-3 py-2 rounded-lg bg-primary text-white"
+              <button
+                onClick={() => {
+                  setCurrentView('dashboard');
+                  setActiveScanId(null);
+                }}
+                className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg ${
+                  currentView === 'dashboard' ? 'bg-primary text-white' : 'text-slate-600 hover:bg-slate-100'
+                }`}
                 data-testid="nav-dashboard"
               >
                 <Search className="w-5 h-5" />
                 <span>Dashboard</span>
-              </a>
+              </button>
             </li>
             <li>
-              <a 
-                href="#" 
-                className="flex items-center space-x-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100"
+              <button
+                onClick={() => setCurrentView('dashboard')}
+                className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100"
                 data-testid="nav-new-scan"
               >
                 <Plus className="w-5 h-5" />
                 <span>New Scan</span>
-              </a>
+              </button>
             </li>
             <li>
-              <a 
-                href="#" 
-                className="flex items-center space-x-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100"
+              <button
+                onClick={() => setCurrentView('history')}
+                className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg ${
+                  currentView === 'history' ? 'bg-primary text-white' : 'text-slate-600 hover:bg-slate-100'
+                }`}
                 data-testid="nav-history"
               >
                 <History className="w-5 h-5" />
                 <span>Scan History</span>
-              </a>
+              </button>
             </li>
             <li>
               <a 
@@ -151,44 +159,26 @@ export default function Dashboard() {
 
         {/* Content Area */}
         <div className="p-6 overflow-y-auto h-full">
-          {/* URL Input Section */}
-          <ScanForm onScanStarted={handleScanStarted} />
-
-          {/* Current Scan Progress */}
-          {activeScanId && (isScanning || scanLoading) && (
-            <ScanProgress 
-              scanId={activeScanId} 
-              url={(activeScanData as any)?.scan?.url} 
-              status={(activeScanData as any)?.scan?.status}
-            />
-          )}
-
-          {/* Results Dashboard */}
-          {isCompleted && activeScanData && (
-            <>
-              <PillarScores results={(activeScanData as any).results} />
-              <OverallScore report={(activeScanData as any).report} results={(activeScanData as any).results} />
-              <Recommendations report={(activeScanData as any).report} />
-            </>
-          )}
-
-          {/* Recent Scans */}
-          {!activeScanId && (
+          {/* Scan History View */}
+          {currentView === 'history' && (
             <Card className="p-6">
-              <h3 className="text-lg font-semibold text-slate-900 mb-4">Recent Scans</h3>
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">All Scan History</h3>
               {recentScans && (recentScans as any).length > 0 ? (
                 <div className="space-y-3">
                   {(recentScans as any).map((scan: ScanData) => (
                     <div 
                       key={scan.id} 
                       className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer"
-                      onClick={() => setActiveScanId(scan.id)}
-                      data-testid={`scan-item-${scan.id}`}
+                      onClick={() => {
+                        setActiveScanId(scan.id);
+                        setCurrentView('dashboard');
+                      }}
+                      data-testid={`history-scan-${scan.id}`}
                     >
-                      <div>
+                      <div className="flex-1">
                         <p className="font-medium text-slate-900">{scan.url}</p>
                         <p className="text-sm text-slate-500">
-                          {new Date(scan.createdAt).toLocaleDateString()}
+                          {new Date(scan.createdAt).toLocaleDateString()} at {new Date(scan.createdAt).toLocaleTimeString()}
                         </p>
                       </div>
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${
@@ -204,9 +194,72 @@ export default function Dashboard() {
                   ))}
                 </div>
               ) : (
-                <p className="text-slate-500">No recent scans. Start your first scan above.</p>
+                <p className="text-slate-500">No scan history available.</p>
               )}
             </Card>
+          )}
+
+          {/* Dashboard View */}
+          {currentView === 'dashboard' && (
+            <>
+              {/* URL Input Section */}
+              <ScanForm onScanStarted={handleScanStarted} />
+
+              {/* Current Scan Progress */}
+              {activeScanId && (isScanning || scanLoading) && (
+                <ScanProgress 
+                  scanId={activeScanId} 
+                  url={(activeScanData as any)?.scan?.url} 
+                  status={(activeScanData as any)?.scan?.status}
+                />
+              )}
+
+              {/* Results Dashboard */}
+              {isCompleted && activeScanData && (
+                <>
+                  <PillarScores results={(activeScanData as any).results} />
+                  <OverallScore report={(activeScanData as any).report} results={(activeScanData as any).results} />
+                  <Recommendations report={(activeScanData as any).report} />
+                </>
+              )}
+
+              {/* Recent Scans */}
+              {!activeScanId && (
+                <Card className="p-6">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4">Recent Scans</h3>
+                  {recentScans && (recentScans as any).length > 0 ? (
+                    <div className="space-y-3">
+                      {(recentScans as any).map((scan: ScanData) => (
+                        <div 
+                          key={scan.id} 
+                          className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer"
+                          onClick={() => setActiveScanId(scan.id)}
+                          data-testid={`scan-item-${scan.id}`}
+                        >
+                          <div>
+                            <p className="font-medium text-slate-900">{scan.url}</p>
+                            <p className="text-sm text-slate-500">
+                              {new Date(scan.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                            scan.status === 'completed' 
+                              ? 'bg-green-100 text-green-800' 
+                              : scan.status === 'failed'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {scan.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-slate-500">No recent scans. Start your first scan above.</p>
+                  )}
+                </Card>
+              )}
+            </>
           )}
         </div>
       </main>
