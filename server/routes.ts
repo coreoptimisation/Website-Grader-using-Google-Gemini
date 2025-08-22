@@ -145,27 +145,98 @@ async function processScan(scanId: string, url: string) {
       storage.createScanResult(result)
     ));
 
-    // Run Gemini analysis
-    const geminiAnalysis = await analyzeWebsiteFindings({
-      url: evidence.url,
-      accessibility: evidence.accessibility,
-      performance: evidence.performance,
-      security: evidence.security,
-      agentReadiness: evidence.agentReadiness
-    });
-
-    // Calculate weighted overall score using the shared scoring module
-    const overallScore = calculateOverallScore(geminiAnalysis.pillarScores);
-    const grade = getGrade(overallScore);
-    const gradeExplanation = getGradeExplanation(grade, overallScore);
+    // Run Gemini analysis with fallback handling
+    let geminiAnalysis;
+    let overallScore;
+    let grade;
+    let gradeExplanation;
+    
+    try {
+      geminiAnalysis = await analyzeWebsiteFindings({
+        url: evidence.url,
+        accessibility: evidence.accessibility,
+        performance: evidence.performance,
+        security: evidence.security,
+        agentReadiness: evidence.agentReadiness
+      });
+      
+      // Calculate weighted overall score using the shared scoring module
+      overallScore = calculateOverallScore(geminiAnalysis.pillarScores);
+      grade = getGrade(overallScore);
+      gradeExplanation = getGradeExplanation(grade, overallScore);
+    } catch (geminiError) {
+      console.error("Gemini analysis failed, using fallback values:", geminiError);
+      
+      // Use the actual scores from the scanners as fallback
+      const pillarScoresNumeric = {
+        accessibility: evidence.accessibility.score,
+        trust: evidence.security.score,
+        uxPerf: evidence.performance.score,
+        agentReadiness: evidence.agentReadiness.score
+      };
+      
+      overallScore = calculateOverallScore(pillarScoresNumeric);
+      grade = getGrade(overallScore);
+      gradeExplanation = getGradeExplanation(grade, overallScore);
+      
+      // Create fallback analysis with structure matching GeminiAnalysisResult
+      const pillarScores = {
+        accessibility: { score: evidence.accessibility.score, grade: getGrade(evidence.accessibility.score) },
+        trustAndSecurity: { score: evidence.security.score, grade: getGrade(evidence.security.score) },
+        performance: { score: evidence.performance.score, grade: getGrade(evidence.performance.score) },
+        agentReadiness: { score: evidence.agentReadiness.score, grade: getGrade(evidence.agentReadiness.score) }
+      };
+      
+      geminiAnalysis = {
+        overallScore,
+        pillarScores,
+        topFixes: [],
+        summary: `Scan completed with overall score: ${overallScore}. AI recommendations temporarily unavailable.`,
+        recommendations: {
+          accessibility: ["AI recommendations temporarily unavailable - scan data collected successfully"],
+          trustAndSecurity: ["AI recommendations temporarily unavailable - scan data collected successfully"],
+          performance: ["AI recommendations temporarily unavailable - scan data collected successfully"],
+          agentReadiness: ["AI recommendations temporarily unavailable - scan data collected successfully"]
+        },
+        // Adding extended properties that may be expected
+        detailedRecommendations: {
+          accessibility: ["AI recommendations temporarily unavailable - scan data collected successfully"],
+          trustAndSecurity: ["AI recommendations temporarily unavailable - scan data collected successfully"],
+          performance: ["AI recommendations temporarily unavailable - scan data collected successfully"],
+          agentReadiness: ["AI recommendations temporarily unavailable - scan data collected successfully"]
+        },
+        executiveSummary: `Your website achieved an overall score of ${overallScore} (${grade}). AI-powered recommendations are temporarily unavailable due to service load, but all scan data has been collected successfully.`,
+        technicalSummary: "Scan completed successfully. AI analysis service temporarily unavailable.",
+        eaaCompliance: {
+          compliant: evidence.accessibility.score >= 90,
+          criticalIssues: [],
+          deadline: "June 28, 2025",
+          recommendations: ["Review accessibility scan results for EAA compliance"]
+        },
+        agentActionBlueprint: {
+          actions: [],
+          priority: []
+        },
+        topImpactFixes: [
+          {
+            issue: "AI Analysis Temporarily Unavailable",
+            description: "The AI analysis service is temporarily unavailable. Your scan data has been collected successfully.",
+            expectedImpact: "Medium",
+            implementationDifficulty: "Low",
+            codeSnippet: "",
+            pillar: "general"
+          }
+        ]
+      } as any;
+    }
 
     // Create scan report
     await storage.createScanReport({
       scanId,
       overallScore,
       grade,
-      topFixes: geminiAnalysis.topFixes,
-      summary: geminiAnalysis.summary,
+      topFixes: geminiAnalysis.topFixes || geminiAnalysis.topImpactFixes || [],
+      summary: geminiAnalysis.summary || geminiAnalysis.executiveSummary,
       geminiAnalysis: {
         ...geminiAnalysis,
         overallGrade: grade,
