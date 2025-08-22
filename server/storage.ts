@@ -39,6 +39,9 @@ export interface IStorage {
   // Evidence operations
   createScanEvidence(evidence: Omit<ScanEvidence, 'id' | 'createdAt'>): Promise<ScanEvidence>;
   getScanEvidence(scanId: string): Promise<ScanEvidence[]>;
+  
+  // Delete operations
+  deleteScan(scanId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -147,6 +150,29 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(scanEvidence)
       .where(eq(scanEvidence.scanId, scanId));
+  }
+  
+  async deleteScan(scanId: string): Promise<void> {
+    // Delete in order to respect foreign key constraints
+    // First delete evidence
+    await db
+      .delete(scanEvidence)
+      .where(eq(scanEvidence.scanId, scanId));
+    
+    // Then delete results
+    await db
+      .delete(scanResults)
+      .where(eq(scanResults.scanId, scanId));
+    
+    // Then delete reports
+    await db
+      .delete(scanReports)
+      .where(eq(scanReports.scanId, scanId));
+    
+    // Finally delete the scan itself
+    await db
+      .delete(scans)
+      .where(eq(scans.id, scanId));
   }
 }
 

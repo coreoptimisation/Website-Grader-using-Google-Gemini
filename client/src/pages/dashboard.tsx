@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
-import { Search, Plus, History, FileText, Settings, SearchCode } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Search, Plus, History, FileText, Settings, SearchCode, Trash2 } from "lucide-react";
 import ScanForm from "@/components/scan-form";
 import ScanProgress from "@/components/scan-progress";
 import PillarScores from "@/components/pillar-scores";
@@ -12,11 +12,14 @@ import AgentReadinessDetails from "@/components/agent-readiness-details";
 import PerformanceDetails from "@/components/performance-details";
 import TrustSecurityDetails from "@/components/trust-security-details";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import type { ScanData } from "@/lib/types";
 
 export default function Dashboard() {
   const [activeScanId, setActiveScanId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<'dashboard' | 'history'>('dashboard');
+  const { toast } = useToast();
 
   const { data: recentScans } = useQuery({
     queryKey: ['/api/scans'],
@@ -40,6 +43,34 @@ export default function Dashboard() {
     setActiveScanId(scanId);
     // Invalidate scans list to show the new scan
     queryClient.invalidateQueries({ queryKey: ['/api/scans'] });
+  };
+
+  const deleteScanMutation = useMutation({
+    mutationFn: async (scanId: string) => {
+      return apiRequest(`/api/scans/${scanId}`, {
+        method: 'DELETE'
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/scans'] });
+      toast({
+        title: "Scan deleted",
+        description: "The scan has been successfully deleted."
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete the scan. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const handleDeleteScan = (scanId: string) => {
+    if (confirm('Are you sure you want to delete this scan?')) {
+      deleteScanMutation.mutate(scanId);
+    }
   };
 
   const isScanning = (activeScanData as any)?.scan?.status === 'scanning';
@@ -172,14 +203,16 @@ export default function Dashboard() {
                   {(recentScans as any).map((scan: any) => (
                     <div 
                       key={scan.id} 
-                      className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer"
-                      onClick={() => {
-                        setActiveScanId(scan.id);
-                        setCurrentView('dashboard');
-                      }}
+                      className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50"
                       data-testid={`history-scan-${scan.id}`}
                     >
-                      <div className="flex-1">
+                      <div 
+                        className="flex-1 cursor-pointer"
+                        onClick={() => {
+                          setActiveScanId(scan.id);
+                          setCurrentView('dashboard');
+                        }}
+                      >
                         <p className="font-medium text-slate-900">{scan.url}</p>
                         <p className="text-sm text-slate-500">
                           {new Date(scan.createdAt).toLocaleDateString()} at {new Date(scan.createdAt).toLocaleTimeString()}
@@ -207,6 +240,18 @@ export default function Dashboard() {
                         }`}>
                           {scan.status}
                         </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="ml-2 hover:bg-red-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteScan(scan.id);
+                          }}
+                          data-testid={`delete-scan-${scan.id}`}
+                        >
+                          <Trash2 className="w-4 h-4 text-red-600" />
+                        </Button>
                       </div>
                     </div>
                   ))}

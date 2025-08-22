@@ -89,6 +89,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete scan
+  app.delete("/api/scans/:id", async (req, res) => {
+    try {
+      const scanId = req.params.id;
+      
+      // Delete all related data for the scan
+      await storage.deleteScan(scanId);
+      
+      res.json({ success: true, message: "Scan deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting scan:", error);
+      res.status(500).json({ error: "Failed to delete scan" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
