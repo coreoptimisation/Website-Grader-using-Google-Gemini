@@ -7,6 +7,7 @@ import ScanProgress from "@/components/scan-progress";
 import PillarScores from "@/components/pillar-scores";
 import OverallScore from "@/components/overall-score";
 import Recommendations from "@/components/recommendations";
+import AccessibilityDetails from "@/components/accessibility-details";
 import { Card } from "@/components/ui/card";
 import type { ScanData } from "@/lib/types";
 
@@ -233,6 +234,9 @@ export default function Dashboard() {
                 <>
                   <PillarScores results={(activeScanData as any).results} />
                   <OverallScore report={(activeScanData as any).report} results={(activeScanData as any).results} />
+                  <AccessibilityDetails 
+                    rawData={(activeScanData as any).results?.find((r: any) => r.pillar === 'accessibility')?.rawData}
+                  />
                   <Recommendations report={(activeScanData as any).report} />
                 </>
               )}
