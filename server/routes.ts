@@ -5,6 +5,7 @@ import { runCompleteScan } from "./scanner";
 import { analyzeWebsiteFindings } from "./gemini";
 import { z } from "zod";
 import { calculateOverallScore, getGrade, getGradeExplanation } from "../shared/scoring";
+import { generateAgentActionBlueprint } from "./scanner/agent-blueprint";
 
 const scanRequestSchema = z.object({
   url: z.string().url("Invalid URL format"),
@@ -187,11 +188,19 @@ async function processScan(scanId: string, url: string) {
         agentReadiness: { score: evidence.agentReadiness.score, grade: getGrade(evidence.agentReadiness.score) }
       };
       
+      // Generate real Agent Action Blueprint from scan data
+      const agentBlueprint = generateAgentActionBlueprint(
+        evidence.accessibility,
+        evidence.performance,
+        evidence.security,
+        evidence.agentReadiness
+      );
+      
       geminiAnalysis = {
         overallScore,
         pillarScores,
         topFixes: [],
-        summary: `Scan completed with overall score: ${overallScore}. AI recommendations temporarily unavailable.`,
+        summary: `Scan completed with overall score: ${overallScore}. Found ${agentBlueprint.totalActions} actionable improvements.`,
         recommendations: {
           accessibility: ["AI recommendations temporarily unavailable - scan data collected successfully"],
           trustAndSecurity: ["AI recommendations temporarily unavailable - scan data collected successfully"],
@@ -205,28 +214,25 @@ async function processScan(scanId: string, url: string) {
           performance: ["AI recommendations temporarily unavailable - scan data collected successfully"],
           agentReadiness: ["AI recommendations temporarily unavailable - scan data collected successfully"]
         },
-        executiveSummary: `Your website achieved an overall score of ${overallScore} (${grade}). AI-powered recommendations are temporarily unavailable due to service load, but all scan data has been collected successfully.`,
-        technicalSummary: "Scan completed successfully. AI analysis service temporarily unavailable.",
+        executiveSummary: `Your website achieved an overall score of ${overallScore} (${grade}). ${agentBlueprint.summary}`,
+        technicalSummary: `Scan completed successfully. ${agentBlueprint.criticalCount} critical issues found. ${agentBlueprint.automationPotential}% of actions can be automated.`,
         eaaCompliance: {
           compliant: evidence.accessibility.score >= 90,
-          criticalIssues: [],
+          criticalIssues: evidence.accessibility.criticalViolations > 0 ? 
+            [`${evidence.accessibility.criticalViolations} critical accessibility violations found`] : [],
           deadline: "June 28, 2025",
           recommendations: ["Review accessibility scan results for EAA compliance"]
         },
-        agentActionBlueprint: {
-          actions: [],
-          priority: []
-        },
-        topImpactFixes: [
-          {
-            issue: "AI Analysis Temporarily Unavailable",
-            description: "The AI analysis service is temporarily unavailable. Your scan data has been collected successfully.",
-            expectedImpact: "Medium",
-            implementationDifficulty: "Low",
-            codeSnippet: "",
-            pillar: "general"
-          }
-        ]
+        agentActionBlueprint: agentBlueprint,
+        topImpactFixes: agentBlueprint.actions.slice(0, 5).map(action => ({
+          issue: action.action,
+          description: action.description,
+          expectedImpact: action.estimatedImpact,
+          implementationDifficulty: action.priority === 'critical' ? 'High' : 
+                                    action.priority === 'high' ? 'Medium' : 'Low',
+          codeSnippet: action.technicalDetails.code || '',
+          pillar: action.category
+        }))
       } as any;
     }
 

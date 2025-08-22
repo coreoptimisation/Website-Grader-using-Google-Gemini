@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { analyzeSSLCertificate, evaluateSSLSecurity } from "./ssl";
 
 export interface SecurityResult {
   score: number;
@@ -110,6 +111,10 @@ export async function runSecurityAudit(url: string): Promise<SecurityResult> {
     
     score = Math.min(100, score); // Cap at 100
     
+    // Analyze SSL certificate
+    const sslCertificate = await analyzeSSLCertificate(url);
+    const sslEvaluation = evaluateSSLSecurity(sslCertificate);
+    
     // Check for common vulnerabilities (basic)
     const vulnerabilities: string[] = [];
     
@@ -129,8 +134,18 @@ export async function runSecurityAudit(url: string): Promise<SecurityResult> {
       vulnerabilities.push("Missing X-Content-Type-Options header");
     }
     
+    // Add SSL-related vulnerabilities
+    if (sslEvaluation.issues.length > 0) {
+      vulnerabilities.push(...sslEvaluation.issues);
+    }
+    
+    // Adjust score based on SSL evaluation
+    const baseScore = score;
+    const sslWeight = 0.3; // SSL represents 30% of security score
+    const finalScore = Math.round(baseScore * (1 - sslWeight) + sslEvaluation.score * sslWeight);
+    
     return {
-      score,
+      score: finalScore,
       headers: {
         present: presentHeaders,
         missing: missingHeaders,
@@ -138,7 +153,7 @@ export async function runSecurityAudit(url: string): Promise<SecurityResult> {
       },
       policies,
       https: isHttps,
-      certificates: null, // Would require additional SSL certificate analysis
+      certificates: sslCertificate,
       vulnerabilities
     };
     

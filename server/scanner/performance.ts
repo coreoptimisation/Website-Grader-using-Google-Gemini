@@ -1,5 +1,6 @@
 import lighthouse from "lighthouse";
 import puppeteer from "puppeteer";
+import { fetchCrUXData, CrUXResult } from "./crux";
 
 export interface PerformanceResult {
   score: number;
@@ -14,7 +15,12 @@ export interface PerformanceResult {
   opportunities: any[];
   diagnostics: any[];
   metrics: any;
-  cruxData?: any;
+  cruxData?: CrUXResult;
+  fieldData?: {
+    available: boolean;
+    metrics?: any;
+    overallCategory?: string;
+  };
 }
 
 export async function runPerformanceAudit(url: string): Promise<PerformanceResult> {
@@ -89,37 +95,35 @@ export async function runPerformanceAudit(url: string): Promise<PerformanceResul
         displayValue: lhr.audits[ref.id].displayValue
       })) || [];
     
-    // Try to fetch CrUX data (would require CrUX API key)
-    let cruxData = null;
-    try {
-      if (process.env.CRUX_API_KEY) {
-        const cruxResponse = await fetch(`https://chromeuxreport.googleapis.com/v1/records:queryRecord?key=${process.env.CRUX_API_KEY}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            origin: new URL(url).origin,
-            formFactor: 'DESKTOP'
-          })
-        });
-        
-        if (cruxResponse.ok) {
-          cruxData = await cruxResponse.json();
-        }
-      }
-    } catch (error) {
-      console.log('CrUX data not available:', error);
+    // Fetch CrUX real-user field data
+    const cruxData = await fetchCrUXData(url);
+    
+    // Combine lab and field data for comprehensive scoring
+    let finalScore = lighthouseScore;
+    
+    // If we have CrUX field data, adjust the score based on real-user experience
+    if (cruxData.available && cruxData.overallCategory) {
+      // Weight: 60% lab data (Lighthouse), 40% field data (CrUX)
+      const fieldScore = cruxData.overallCategory === 'GOOD' ? 90 : 
+                         cruxData.overallCategory === 'NEEDS_IMPROVEMENT' ? 70 : 50;
+      finalScore = Math.round(lighthouseScore * 0.6 + fieldScore * 0.4);
     }
     
     return {
-      score: lighthouseScore,
+      score: finalScore,
       lighthouseScore,
       coreWebVitals,
       opportunities,
       diagnostics,
       metrics: lhr.audits,
-      cruxData
+      cruxData,
+      fieldData: cruxData.available ? {
+        available: true,
+        metrics: cruxData.metrics,
+        overallCategory: cruxData.overallCategory
+      } : {
+        available: false
+      }
     };
     
   } catch (error) {

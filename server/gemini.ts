@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateAgentActionBlueprint } from "./scanner/agent-blueprint";
 import { calculateOverallScore, getGrade, getGradeExplanation, calculateTopFixes, PillarScores } from "../shared/scoring";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY || "");
@@ -151,6 +152,14 @@ Example JSON-LD for Organization:
 
 For EAA compliance (European Accessibility Act - deadline June 28, 2025), map WCAG violations to EAA requirements where relevant. Note which violations are critical for EAA compliance.`;
 
+  // Generate Agent Action Blueprint from scan data
+  const agentBlueprint = generateAgentActionBlueprint(
+    evidence.accessibility,
+    evidence.performance,
+    evidence.security,
+    evidence.agentReadiness
+  );
+
   try {
     const result = await model.generateContent({ contents: [{ role: "user", parts: [{ text: prompt }] }] });
     const responseText = result.response.text();
@@ -161,7 +170,12 @@ For EAA compliance (European Accessibility Act - deadline June 28, 2025), map WC
 
     // Try to parse the JSON response
     try {
-      return JSON.parse(responseText) as GeminiAnalysisResult;
+      const parsedResult = JSON.parse(responseText) as GeminiAnalysisResult;
+      // Add the agent action blueprint to the result
+      return {
+        ...parsedResult,
+        agentActionBlueprint: agentBlueprint
+      } as any;
     } catch (parseError) {
       console.error("Failed to parse Gemini response as JSON:", parseError);
       console.error("Response text length:", responseText.length);
@@ -171,7 +185,11 @@ For EAA compliance (European Accessibility Act - deadline June 28, 2025), map WC
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         try {
-          return JSON.parse(jsonMatch[0]) as GeminiAnalysisResult;
+          const parsedResult = JSON.parse(jsonMatch[0]) as GeminiAnalysisResult;
+          return {
+            ...parsedResult,
+            agentActionBlueprint: agentBlueprint
+          } as any;
         } catch (secondParseError) {
           console.error("Failed to parse extracted JSON:", secondParseError);
         }
@@ -210,10 +228,7 @@ For EAA compliance (European Accessibility Act - deadline June 28, 2025), map WC
           deadline: "June 28, 2025",
           recommendations: ["Retry scan for EAA compliance assessment"]
         },
-        agentActionBlueprint: {
-          actions: [],
-          priority: []
-        }
+        agentActionBlueprint: agentBlueprint
       };
     }
   } catch (error) {
