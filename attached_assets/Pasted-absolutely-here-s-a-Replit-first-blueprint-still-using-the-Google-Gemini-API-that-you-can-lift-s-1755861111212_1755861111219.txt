@@ -1,0 +1,312 @@
+absolutely — here’s a Replit-first blueprint (still using the Google Gemini API) that you can lift straight into a two-week build. I’ve tuned this for UK English, Ireland-focused orgs, and the four pillars you set (Accessibility, Trust & Transparency, UX/Performance, Agent Readiness).
+
+# AI-Powered Website Grader — Replit build (Gemini inside)
+
+## Why Replit for this challenge
+
+* **Frictionless setup & deploy:** Replit Apps + Deployments (Static, Autoscale, Reserved VM, and **Scheduled Deployments**) make it easy to host the API/UI and run recurring scans on a schedule without extra infra. ([docs.replit.com][1])
+* **Secrets & storage built in:** Use **Deployment Secrets** for the Gemini key, PSI/CrUX/Web Risk keys, etc., plus **Replit App Storage** (Google Cloud Storage under the hood) for evidence artefacts (screenshots / JSON snippets). For small state, use **Key-Value Store**; for reports, use **Replit SQL Database (Postgres)**. ([docs.replit.com][2])
+* **Long-running workers:** A **Reserved VM** deployment is ideal for a headless-browser scanner and API with consistent resources. Use **Scheduled Deployments** to kick off batch scans nightly or weekly. ([docs.replit.com][3])
+
+---
+
+## High-level architecture (mono-repo inside one Replit project)
+
+```
+/api                 -> Express (Node) API w/ Gemini SDK, orchestrates scans & scoring
+/scanner             -> Node worker (Playwright + axe-core + Lighthouse CLI)
+/ui                  -> React/Vite (or Next.js) scorecard + report viewer
+/shared              -> Types & scoring logic shared across api/ui/scanner
+/storage             -> thin wrapper for Replit App Storage & SQL DB
+/schedules           -> entrypoints for Scheduled Deployments (cron-like tasks)
+```
+
+**Why Node end-to-end?**
+It keeps Playwright + axe-core + Lighthouse in their native ecosystem, and we can use the official **Google GenAI SDK** for JavaScript for Gemini. (You could alternatively keep Python; the Gemini SDK exists for both.) ([Chrome for Developers][4], [GitHub][5], [Google AI for Developers][6])
+
+---
+
+## Pillar coverage — what we check & how
+
+### 1) Accessibility (EAA-aware, WCAG-oriented)
+
+* **Automated rules:** run **axe-core** via **@axe-core/playwright** across key pages; collect violations, severities, selectors, and suggested fixes. ([GitHub][7], [npm][8], [Playwright][9])
+* **Examples in report:** Gemini rewrites each violation into plain-English, “do this next” steps, optionally producing patch-like HTML snippets.
+* **EAA tie-in:** map common axe rules to obligations under the European Accessibility Act (informative mapping in copy; we’re not providing legal advice). EAA formally applies from **28 June 2025** for many services.
+
+### 2) Trust & Transparency
+
+* **Security headers:** detect **CSP**, **HSTS**, **Referrer-Policy**, **X-Content-Type-Options**, **Permissions-Policy** presence and baseline patterns; provide minimum viable examples. ([MDN Web Docs][10], [OWASP Foundation][11], [OWASP Cheat Sheet Series][12])
+* **Policy hygiene:** check existence & crawlability of Privacy Policy / Terms / Contact pages; summarise clarity with Gemini.
+* **Malware/unsafe URLs:** optional **Web Risk Lookup API** for known unsafe links on sampled pages. ([Google Cloud][13])
+
+### 3) UX & Performance
+
+* **Lab + field:** fetch **PageSpeed Insights API** (Lighthouse lab) AND **CrUX API** (real-user field) for Core Web Vitals. PSI is moving CrUX out to the dedicated **CrUX API** — we’ll call that directly. ([Google for Developers][14], [Chrome for Developers][15])
+* **Gemini explanations:** translate numeric vitals and Lighthouse opportunities into concrete tasks (“compress hero image to ≤200 KB”, “inline critical CSS”, etc.).
+
+### 4) Agent Readiness
+
+* **Discovery & structure:** validate **robots.txt**, **sitemaps**, **canonical** tags, and **hreflang** usage; extract **JSON-LD** (schema.org) via a structured-data extractor and check against Google’s structured-data guidance. ([Google for Developers][16])
+* **Machine-readable actions:** if pages expose actions (forms/APIs), propose **schema.org Action / potentialAction** stubs and a simple **“Agent Action Blueprint”** JSON (OpenAPI-lite) to make key tasks (book, enquire, apply) invokable by assistants. ([Schema.org][17])
+* **Speakable summaries (optional):** suggest `speakable` blocks for key pages (beta). ([Google for Developers][18])
+
+---
+
+## Scoring model (kept simple & explainable)
+
+Weights (editable in `/shared/scoring.ts`):
+
+* Accessibility 40%
+* Trust & Transparency 20%
+* UX/Performance 25%
+* Agent Readiness 15%
+
+Each pillar normalises inputs to 0–100. We also compute a **“Top 5 Impact Fixes”** list by expected reach × effort × severity (heuristics inferred from PSI opportunities, axe impact, and whether the change is sitewide).
+
+---
+
+## Data flow on Replit
+
+1. **User enters a URL** in `/ui`, posts to `/api/scan`.
+2. **API** enqueues a job (in-process queue or tiny table in Replit SQL DB).
+3. **Scanner** pulls the job:
+
+   * Runs Playwright to render HTML; injects **axe-core** for a11y; optionally snapshots full-page PNG. ([Playwright][9])
+   * Calls **Lighthouse CLI** for lab metrics; fetches **CrUX** for field metrics. ([GitHub][5], [Chrome for Developers][15])
+   * Fetches **PSI** if you prefer single API for Lighthouse data. ([Google for Developers][14])
+   * Fetches **robots.txt**, **sitemaps**, **canonical/hreflang** tags, and parses **JSON-LD** (extruct-like approach) to verify schema presence. ([Google for Developers][16], [PyPI][19])
+   * Optional **Web Risk** for suspicious outbound links. ([Google Cloud][13])
+4. **API** sends a compact evidence bundle to **Gemini** with a strict JSON schema (we’ll use the SDK’s `responseSchema` so output is reliable JSON). ([Google AI for Developers][20])
+5. Store results in **Replit SQL Database**, put screenshots / raw artefacts into **App Storage**, and return a **scorecard + one-page report** to `/ui`. ([docs.replit.com][2])
+
+---
+
+## Key implementation choices (with copy-pasteable starters)
+
+### A) Gemini SDK (JavaScript)
+
+```ts
+// /api/gemini.ts
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const model = genAI.getGenerativeModel({
+  model: "gemini-2.0-flash",
+  // enforce structured output
+  generationConfig: {
+    responseMimeType: "application/json",
+    responseSchema: {
+      type: "object",
+      properties: {
+        summary: { type: "string" },
+        topFixes: { type: "array", items: { type: "string" } },
+        pillarScores: {
+          type: "object",
+          properties: {
+            accessibility: { type: "number" },
+            trust: { type: "number" },
+            uxPerf: { type: "number" },
+            agentReadiness: { type: "number" }
+          },
+          required: ["accessibility","trust","uxPerf","agentReadiness"]
+        },
+        recommendations: { type: "array", items: { type: "object",
+          properties: {
+            title: { type: "string" },
+            rationale: { type: "string" },
+            exampleHtml: { type: "string" },
+            exampleJsonLd: { type: "string" },
+            cspSnippet: { type: "string" }
+          }}}
+      },
+      required: ["summary","topFixes","pillarScores","recommendations"]
+    }
+  }
+});
+
+export async function summariseFindings(evidence: any) {
+  const prompt = `You are grading an Irish SME/public-service site against Accessibility, Trust & Transparency, UX/Performance and Agent Readiness. 
+Return succinct, plain-English actions with example snippets (HTML/JSON-LD/CSP). Evidence:\n${JSON.stringify(evidence)}`;
+  const res = await model.generateContent({ contents: [{ role: "user", parts: [{ text: prompt }]}] });
+  return JSON.parse(res.response.text());
+}
+```
+
+(Uses the official **Google GenAI SDK** and its response schema feature to keep outputs machine-parsable.) ([Google AI for Developers][6])
+
+### B) Accessibility scan (Playwright + axe-core)
+
+```ts
+// /scanner/a11y.ts
+import { chromium } from "playwright";
+import AxeBuilder from "@axe-core/playwright";
+
+export async function runA11y(url: string) {
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+  await page.goto(url, { waitUntil: "networkidle" });
+  const results = await new AxeBuilder({ page }).analyze();
+  await browser.close();
+  return results; // has violations array with nodes, selectors, helpUrl, etc.
+}
+```
+
+(Playwright’s a11y testing doc + @axe-core/playwright provide this exact pattern.) ([Playwright][9], [npm][8])
+
+### C) Performance (Lighthouse + CrUX)
+
+```ts
+// /scanner/perf.ts
+import lighthouse from "lighthouse";
+import puppeteer from "puppeteer";
+
+export async function runLighthouse(url: string) {
+  const browser = await puppeteer.launch({ headless: "new" });
+  const { lhr } = await lighthouse(url, {
+    port: (new URL(browser.wsEndpoint())).port,
+    output: "json",
+    onlyCategories: ["performance","seo","accessibility","best-practices"]
+  });
+  await browser.close();
+  return lhr;
+}
+```
+
+(Lighthouse CLI/programmatic usage; Puppeteer automates Chrome headless.) ([GitHub][5], [Chrome for Developers][21])
+
+For **field** data, call **CrUX API** (28-day aggregation, origin or URL level) and align with lab deltas: ([Chrome for Developers][15])
+
+### D) Agent readiness checks (robots/sitemaps/canonical/hreflang/JSON-LD)
+
+* **Sitemap & robots rules:** fetch `/robots.txt`, follow any `Sitemap:` hints, and parse as XML; check presence and lastmod. ([Google for Developers][16])
+* **Canonical/hreflang rules:** parse `<link rel="canonical">` + `rel="alternate" hreflang="…"` and validate patterns. ([Google for Developers][22])
+* **Structured data:** extract JSON-LD (schema.org), Microdata, RDFa to validate **Organization**, **LocalBusiness**, **Product**, **HowTo**, etc. (extruct-style extraction). ([PyPI][19], [Google for Developers][23])
+* **Potential Actions:** if we detect forms (contact/apply/booking), emit **schema.org `potentialAction`** stubs and an **Agent Action Blueprint** JSON (endpoint, method, fields) for teams to implement. ([Schema.org][17])
+
+### E) Trust & security headers — suggested snippets
+
+* **CSP starter (report-only):**
+
+```http
+Content-Security-Policy-Report-Only: default-src 'self'; img-src 'self' data: https:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; report-uri /csp-report
+```
+
+* **Referrer-Policy & X-Content-Type-Options:**
+
+```http
+Referrer-Policy: strict-origin-when-cross-origin
+X-Content-Type-Options: nosniff
+```
+
+(Based on OWASP and MDN guidance.) ([OWASP Cheat Sheet Series][12], [MDN Web Docs][24])
+
+---
+
+## Replit-specific wiring
+
+### Environment & config
+
+* Use `.replit` & `replit.nix` to pin Node 18+ and Playwright dependencies (Chrome is auto-fetched by Playwright). ([docs.replit.com][25])
+* Add **Deployment Secrets**: `GEMINI_API_KEY`, `PAGESPEED_API_KEY`, `CRUX_API_KEY`, `WEB_RISK_API_KEY`, `DATABASE_URL`. ([docs.replit.com][3])
+* Persist artefacts (screenshots/JSON evidence) in **App Storage** and small metadata in **Key-Value Store**; store report rows in **SQL Database**. ([docs.replit.com][2])
+
+### Deployments
+
+* **Reserved VM** for `/api` + `/scanner` (always on, stable resources). ([docs.replit.com][3])
+* **Scheduled Deployment(s)** for nightly/weekly rescans (e.g., “every Tuesday 03:00 Europe/Dublin”), run `node /schedules/scan-batch.js`. ([docs.replit.com][26])
+* Monitor with **Deployment Monitoring** in Replit to watch CPU/mem and logs. ([docs.replit.com][27])
+
+---
+
+## Output formats
+
+1. **Scorecard JSON** (machine-readable)
+2. **One-page HTML/PDF** with: overall score; pillar scores; **Top 5 Impact Fixes**; code snippets (HTML/JSON-LD/CSP); links to evidence artefacts.
+3. **Agent Action Blueprint** (optional JSON) detailing suggested `potentialAction` or simple OpenAPI-lite endpoints (method, path, requestSchema), to make the site agent-friendly. ([Schema.org][17])
+
+---
+
+## Guard-rails (proportionate & lawful)
+
+* **Public pages only** (respect robots & noindex). We read robots/sitemaps and avoid blocked paths; warn if pages are `noindex`. ([Google for Developers][28])
+* **Minimal data retention:** store just the **URL**, **hash of HTML** or small evidence snippets + a screenshot (if permitted by robots & meta).
+* **Explainability:** show exactly which rule / API observation led to each recommendation (axe rule id, Lighthouse audit id, CrUX metric).
+
+---
+
+## Day-by-day (two-week) plan
+
+**Days 1–2** — Repo scaffold on Replit; secrets set; SQL DB created; App Storage bucket connected. Create `/api/health`. ([docs.replit.com][2])
+**Days 3–4** — Scanner MVP: Playwright fetch + axe scan on one URL; PSI + CrUX fetch; store in DB. ([Playwright][9], [Google for Developers][14], [Chrome for Developers][15])
+**Days 5–6** — Agent-readiness checks (robots/sitemap/canonical/hreflang/JSON-LD). ([Google for Developers][16])
+**Days 7–8** — Gemini integration with strict response schema and scoring model. ([Google AI for Developers][20])
+**Days 9–10** — UI: scorecard + one-page report with “copy/paste” code blocks.
+**Day 11** — Trust & security header checker + snippet generator (CSP/Referrer-Policy/etc.). ([OWASP Cheat Sheet Series][12], [MDN Web Docs][24])
+**Day 12** — Scheduled Deployment for batch scans; basic auth on API; Monitoring. ([docs.replit.com][26])
+**Days 13–14** — Polish: Top-5 Impact Fixes logic; EAA copy; mentor/user feedback loop; pricing toggle.
+
+---
+
+## Adoption & monetisation (credible path)
+
+* **Free quick check** (single URL, instant score + 3 fixes).
+* **Pro (monthly)**: domain-wide crawl with scheduling, PDF exports with logo, change-tracking, multi-site portfolio view for councils/DMOs.
+* **Services**: hands-on remediation packages (accessibility fixes, schema rollout, CSP hardening).
+* **Channel**: partner with local authorities, LEOs, Fáilte Ireland programmes; bundle in digital-maturity audits.
+
+---
+
+## What success looks like (deliverables)
+
+* A **live Replit deployment** with:
+
+  * `/scan` endpoint returning **scorecard JSON**.
+  * A **one-page report** view with code snippets (HTML/JSON-LD/CSP) and an optional **Agent Action Blueprint** JSON download.
+  * Evidence links (screenshots, JSON-LD extracts, Lighthouse/CrUX sections).
+  * A scheduled weekly re-scan (for Pro domains).
+
+---
+
+### Appendix — key references we align to
+
+* **Replit Deployments & Scheduling/Secrets/Storage/DB** (how we deploy, store, and schedule): ([docs.replit.com][1])
+* **Gemini API (SDKs + structured output/response schema)**: ([Google AI for Developers][6])
+* **Accessibility scanning with axe-core + Playwright**: ([Playwright][9], [npm][8])
+* **Performance data (PSI / CrUX)**: ([Google for Developers][14], [Chrome for Developers][15])
+* **Agent readiness (structured data, sitemaps, canonical, hreflang)**: ([Google for Developers][23])
+* **Security headers (CSP, Referrer-Policy, X-Content-Type-Options)**: ([OWASP Cheat Sheet Series][12], [MDN Web Docs][10])
+* **European Accessibility Act context**:
+
+---
+
+If you’d like, I can spin up the exact Replit file skeleton (folders, minimal package.jsons, `.replit`/`replit.nix`, and a working `/scan` stub) so your team can import and start iterating immediately.
+
+[1]: https://docs.replit.com/category/replit-deployments?utm_source=chatgpt.com "Deployment Types"
+[2]: https://docs.replit.com/category/object-storage "Replit Docs"
+[3]: https://docs.replit.com/cloud-services/deployments/reserved-vm-deployments?utm_source=chatgpt.com "Reserved VM Deployments"
+[4]: https://developer.chrome.com/docs/lighthouse/overview?utm_source=chatgpt.com "Introduction to Lighthouse - Chrome for Developers"
+[5]: https://github.com/GoogleChrome/lighthouse?utm_source=chatgpt.com "GoogleChrome/lighthouse"
+[6]: https://ai.google.dev/gemini-api/docs/libraries?utm_source=chatgpt.com "Gemini API libraries | Google AI for Developers"
+[7]: https://github.com/dequelabs/axe-core?utm_source=chatgpt.com "dequelabs/axe-core: Accessibility engine for automated ..."
+[8]: https://www.npmjs.com/package/%40axe-core/playwright?utm_source=chatgpt.com "axe-core/playwright"
+[9]: https://playwright.dev/docs/accessibility-testing?utm_source=chatgpt.com "Accessibility testing"
+[10]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CSP?utm_source=chatgpt.com "Content Security Policy (CSP) - MDN - Mozilla"
+[11]: https://owasp.org/www-project-secure-headers/?utm_source=chatgpt.com "OWASP Secure Headers Project"
+[12]: https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html?utm_source=chatgpt.com "HTTP Security Response Headers Cheat Sheet"
+[13]: https://cloud.google.com/web-risk/docs "Web Risk documentation  |  Google Cloud"
+[14]: https://developers.google.com/speed/docs/insights/v5/get-started "Get Started with the PageSpeed Insights API  |  Google for Developers"
+[15]: https://developer.chrome.com/docs/crux/api "CrUX API  |  Chrome UX Report  |  Chrome for Developers"
+[16]: https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap?utm_source=chatgpt.com "Build and Submit a Sitemap | Google Search Central"
+[17]: https://schema.org/docs/actions.html?utm_source=chatgpt.com "Potential Actions - Schema.org"
+[18]: https://developers.google.com/search/docs/appearance/structured-data/speakable?utm_source=chatgpt.com "Speakable (BETA) Schema Markup | Google Search Central"
+[19]: https://pypi.org/project/extruct/?utm_source=chatgpt.com "extruct"
+[20]: https://ai.google.dev/gemini-api/docs/structured-output?utm_source=chatgpt.com "Structured output | Gemini API | Google AI for Developers"
+[21]: https://developer.chrome.com/docs/puppeteer?utm_source=chatgpt.com "Puppeteer - Chrome for Developers"
+[22]: https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls?utm_source=chatgpt.com "How to Specify a Canonical with rel=\"canonical\" and Other ..."
+[23]: https://developers.google.com/search/docs/appearance/structured-data/intro-structured-data?utm_source=chatgpt.com "Intro to How Structured Data Markup Works"
+[24]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Referrer-Policy?utm_source=chatgpt.com "Referrer-Policy header - MDN - Mozilla"
+[25]: https://docs.replit.com/replit-app/configuration?utm_source=chatgpt.com "Replit App Configuration"
+[26]: https://docs.replit.com/cloud-services/deployments/scheduled-deployments?utm_source=chatgpt.com "Scheduled Deployments"
+[27]: https://docs.replit.com/cloud-services/deployments/monitoring-a-deployment?utm_source=chatgpt.com "Deployment Monitoring"
+[28]: https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag?utm_source=chatgpt.com "Robots Meta Tags Specifications | Google Search Central"
