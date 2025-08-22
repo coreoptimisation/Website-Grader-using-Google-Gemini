@@ -64,13 +64,33 @@ export default function Recommendations({ report }: RecommendationsProps) {
   };
 
   // Group recommendations by pillar
-  const recommendationsByPillar = (report.geminiAnalysis?.recommendations || []).reduce((acc: any, rec: any, index: number) => {
-    if (!acc[rec.pillar]) {
-      acc[rec.pillar] = [];
-    }
-    acc[rec.pillar].push({ ...rec, originalIndex: index });
-    return acc;
-  }, {});
+  // Handle both array format (from Gemini) and object format (from fallback)
+  let recommendationsByPillar: any = {};
+  
+  const recommendations = report.geminiAnalysis?.recommendations;
+  
+  if (Array.isArray(recommendations)) {
+    // Original Gemini format - array of recommendations
+    recommendationsByPillar = recommendations.reduce((acc: any, rec: any, index: number) => {
+      if (!acc[rec.pillar]) {
+        acc[rec.pillar] = [];
+      }
+      acc[rec.pillar].push({ ...rec, originalIndex: index });
+      return acc;
+    }, {});
+  } else if (recommendations && typeof recommendations === 'object') {
+    // Fallback format - object with pillar keys
+    Object.entries(recommendations).forEach(([pillar, items]) => {
+      if (Array.isArray(items)) {
+        recommendationsByPillar[pillar] = items.map((item: any, index: number) => ({
+          pillar,
+          title: typeof item === 'string' ? item : item.title,
+          description: typeof item === 'string' ? item : item.description,
+          originalIndex: index
+        }));
+      }
+    });
+  }
 
   return (
     <Card className="p-6" data-testid="detailed-recommendations">
