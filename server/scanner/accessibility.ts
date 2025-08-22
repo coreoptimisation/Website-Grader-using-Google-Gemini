@@ -49,15 +49,26 @@ export async function runAccessibilityAudit(url: string): Promise<AccessibilityR
     
     const totalViolations = criticalViolations + moderateViolations + minorViolations;
     
-    // Calculate score based on violations and passes
-    // Start with 100 and deduct points based on severity
-    let score = 100;
-    score -= (criticalViolations * 10); // Critical violations: -10 points each
-    score -= (moderateViolations * 5);  // Moderate violations: -5 points each  
-    score -= (minorViolations * 2);     // Minor violations: -2 points each
+    // Calculate score based on both violations and passes
+    // Use a ratio-based approach for fairer scoring
+    const totalChecks = results.passes.length + results.violations.length + results.incomplete.length;
+    const passedChecks = results.passes.length;
     
-    // Minimum score is 0
-    score = Math.max(0, score);
+    // Base score on pass rate (0-100)
+    let score = totalChecks > 0 ? Math.round((passedChecks / totalChecks) * 100) : 100;
+    
+    // Apply penalties for violations based on severity
+    // But cap the total penalty at 50% of the score
+    let penalty = 0;
+    penalty += (criticalViolations * 5);  // Critical violations: -5 points each
+    penalty += (moderateViolations * 3);  // Moderate violations: -3 points each  
+    penalty += (minorViolations * 1);     // Minor violations: -1 point each
+    
+    // Apply penalty but ensure minimum score of 10 if there are any passes
+    score = Math.max(score - penalty, passedChecks > 0 ? 10 : 0);
+    
+    // Ensure score is between 0 and 100
+    score = Math.min(100, Math.max(0, score));
     
     // Determine WCAG compliance level
     let wcagLevel = "AAA";
