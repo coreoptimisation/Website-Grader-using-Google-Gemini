@@ -159,7 +159,63 @@ For EAA compliance (European Accessibility Act - deadline June 28, 2025), map WC
       throw new Error("Empty response from Gemini");
     }
 
-    return JSON.parse(responseText) as GeminiAnalysisResult;
+    // Try to parse the JSON response
+    try {
+      return JSON.parse(responseText) as GeminiAnalysisResult;
+    } catch (parseError) {
+      console.error("Failed to parse Gemini response as JSON:", parseError);
+      console.error("Response text length:", responseText.length);
+      
+      // Attempt to extract valid JSON from the response
+      // Sometimes Gemini adds extra text before/after the JSON
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          return JSON.parse(jsonMatch[0]) as GeminiAnalysisResult;
+        } catch (secondParseError) {
+          console.error("Failed to parse extracted JSON:", secondParseError);
+        }
+      }
+      
+      // Return a fallback analysis if parsing completely fails
+      return {
+        overallScore: 50,
+        pillarScores: {
+          accessibility: { score: 50, grade: "C" },
+          trustAndSecurity: { score: 50, grade: "C" },
+          performance: { score: 50, grade: "C" },
+          agentReadiness: { score: 50, grade: "C" }
+        },
+        topImpactFixes: [
+          {
+            issue: "Analysis Error",
+            description: "Unable to complete full analysis due to response parsing issues",
+            expectedImpact: "Medium",
+            implementationDifficulty: "Low",
+            codeSnippet: "",
+            pillar: "general"
+          }
+        ],
+        detailedRecommendations: {
+          accessibility: ["Unable to analyze - please retry scan"],
+          trustAndSecurity: ["Unable to analyze - please retry scan"],
+          performance: ["Unable to analyze - please retry scan"],
+          agentReadiness: ["Unable to analyze - please retry scan"]
+        },
+        executiveSummary: "The analysis encountered technical issues. Please retry the scan for complete results.",
+        technicalSummary: "JSON parsing error in AI response. The scan data was collected successfully but analysis was incomplete.",
+        eaaCompliance: {
+          compliant: false,
+          criticalIssues: [],
+          deadline: "June 28, 2025",
+          recommendations: ["Retry scan for EAA compliance assessment"]
+        },
+        agentActionBlueprint: {
+          actions: [],
+          priority: []
+        }
+      };
+    }
   } catch (error) {
     console.error("Gemini analysis failed:", error);
     throw new Error(`Failed to analyze website findings: ${error}`);
