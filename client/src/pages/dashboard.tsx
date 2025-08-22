@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { Search, Plus, History, FileText, Settings, SearchCode } from "lucide-react";
 import ScanForm from "@/components/scan-form";
 import ScanProgress from "@/components/scan-progress";
@@ -21,16 +22,31 @@ export default function Dashboard() {
     queryKey: ['/api/scans', activeScanId],
     enabled: !!activeScanId,
     refetchInterval: (data: any) => {
-      return data?.scan?.status === 'scanning' ? 2000 : false;
-    }
+      // Keep polling while scanning or pending
+      const status = data?.scan?.status;
+      return (status === 'scanning' || status === 'pending') ? 2000 : false;
+    },
+    // Ensure we get the final state
+    refetchOnWindowFocus: true,
+    staleTime: 1000
   });
 
   const handleScanStarted = (scanId: string) => {
     setActiveScanId(scanId);
+    // Invalidate scans list to show the new scan
+    queryClient.invalidateQueries({ queryKey: ['/api/scans'] });
   };
 
   const isScanning = (activeScanData as any)?.scan?.status === 'scanning';
   const isCompleted = (activeScanData as any)?.scan?.status === 'completed';
+  
+  // When scan completes, invalidate queries to update the UI
+  useEffect(() => {
+    if (isCompleted && activeScanId) {
+      queryClient.invalidateQueries({ queryKey: ['/api/scans'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/scans', activeScanId] });
+    }
+  }, [isCompleted, activeScanId]);
 
   return (
     <div className="min-h-screen flex">
