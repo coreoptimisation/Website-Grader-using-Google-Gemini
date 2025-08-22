@@ -39,7 +39,10 @@ export interface AgentReadinessResult {
 }
 
 export async function runAgentReadinessAudit(url: string): Promise<AgentReadinessResult> {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ 
+    headless: true,
+    executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium'
+  });
   const baseUrl = new URL(url).origin;
   
   try {
