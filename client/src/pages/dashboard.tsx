@@ -47,9 +47,7 @@ export default function Dashboard() {
 
   const deleteScanMutation = useMutation({
     mutationFn: async (scanId: string) => {
-      return apiRequest(`/api/scans/${scanId}`, {
-        method: 'DELETE'
-      });
+      return apiRequest('DELETE', `/api/scans/${scanId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/scans'] });

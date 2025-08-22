@@ -183,8 +183,8 @@ async function processScan(scanId: string, url: string) {
         },
         performance: {
           score: evidence.performance.score,
-          fcp: evidence.performance.fcp,
-          lcp: evidence.performance.lcp,
+          fcp: evidence.performance.coreWebVitals?.fcp,
+          lcp: evidence.performance.coreWebVitals?.lcp,
           opportunities: evidence.performance.opportunities?.slice(0, 3).map((o: any) => ({
             title: o.title,
             numericValue: o.numericValue
