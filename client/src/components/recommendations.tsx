@@ -151,7 +151,7 @@ export default function Recommendations({ report }: RecommendationsProps) {
                             data-testid={`recommendation-${rec.originalIndex}`}
                           >
                             <div className="flex items-center space-x-3">
-                              <div className={`w-2 h-2 rounded-full ${getSeverityColor(rec.severity)}`}></div>
+                              {rec.severity && <div className={`w-2 h-2 rounded-full ${getSeverityColor(rec.severity)}`}></div>}
                               <span className="font-medium text-slate-900">{rec.title}</span>
                               {rec.wcagLevel && (
                                 <Badge variant="outline" className="text-xs">

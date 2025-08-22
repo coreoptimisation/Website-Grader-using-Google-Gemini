@@ -153,13 +153,41 @@ async function processScan(scanId: string, url: string) {
     let gradeExplanation;
     
     try {
-      geminiAnalysis = await analyzeWebsiteFindings({
+      // Send summarized data to reduce API token usage and avoid quota limits
+      const summarizedEvidence = {
         url: evidence.url,
-        accessibility: evidence.accessibility,
-        performance: evidence.performance,
-        security: evidence.security,
-        agentReadiness: evidence.agentReadiness
-      });
+        accessibility: {
+          score: evidence.accessibility.score,
+          violations: evidence.accessibility.violations?.length || 0,
+          criticalViolations: evidence.accessibility.criticalViolations || 0,
+          topIssues: evidence.accessibility.violations?.slice(0, 3).map((v: any) => ({
+            id: v.id,
+            impact: v.impact,
+            help: v.help
+          })) || []
+        },
+        performance: {
+          score: evidence.performance.score,
+          fcp: evidence.performance.fcp,
+          lcp: evidence.performance.lcp,
+          opportunities: evidence.performance.opportunities?.slice(0, 3).map((o: any) => ({
+            title: o.title,
+            numericValue: o.numericValue
+          })) || []
+        },
+        security: {
+          score: evidence.security.score,
+          https: evidence.security.https,
+          vulnerabilities: evidence.security.vulnerabilities?.slice(0, 3) || []
+        },
+        agentReadiness: {
+          score: evidence.agentReadiness.score,
+          robots: evidence.agentReadiness.robots?.found || false,
+          sitemaps: evidence.agentReadiness.sitemaps?.found || false
+        }
+      };
+      
+      geminiAnalysis = await analyzeWebsiteFindings(summarizedEvidence);
       
       // Calculate weighted overall score using the shared scoring module
       overallScore = calculateOverallScore(geminiAnalysis.pillarScores);

@@ -4,8 +4,10 @@ import { calculateOverallScore, getGrade, getGradeExplanation, calculateTopFixes
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY || "");
 
+// Using gemini-1.5-flash which has better quota limits and is stable
+// Alternative: gemini-2.0-flash-exp (newer but lower quotas)
 const model = genAI.getGenerativeModel({
-  model: "gemini-2.0-flash-exp",
+  model: "gemini-1.5-flash",
   generationConfig: {
     responseMimeType: "application/json",
     responseSchema: {
