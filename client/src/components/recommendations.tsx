@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChevronDown, ChevronRight, Accessibility, Gauge, Shield, Download, FileText } from "lucide-react";
+import { ChevronDown, ChevronRight, Accessibility, Gauge, Shield, Bot, Download, FileText } from "lucide-react";
 import type { ScanReport } from "@/lib/types";
 
 interface RecommendationsProps {
@@ -13,7 +13,7 @@ const PILLAR_ICONS = {
   accessibility: Accessibility,
   performance: Gauge,
   trust: Shield,
-  agentReadiness: Shield
+  agentReadiness: Bot
 };
 
 const PILLAR_COLORS = {

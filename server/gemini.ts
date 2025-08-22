@@ -123,7 +123,11 @@ ${JSON.stringify(evidence, null, 2)}
 Provide a comprehensive analysis with:
 1. Scores for each pillar (0-100)
 2. Top 5 impact fixes ranked by (impact × ease of implementation)
-3. Detailed recommendations with concrete code examples
+3. Detailed recommendations with concrete code examples for ALL FOUR PILLARS:
+   - At least 2-3 recommendations for "accessibility" pillar
+   - At least 2-3 recommendations for "trust" pillar  
+   - At least 2-3 recommendations for "uxPerf" pillar (NOT "performance", use "uxPerf")
+   - At least 2-3 recommendations for "agentReadiness" pillar (REQUIRED - include SEO, structured data, crawlability improvements)
 4. Overall grade (A-F) and weighted score calculation
 5. EAA compliance assessment where relevant
 6. Plain-English explanations suitable for Irish business owners
@@ -133,6 +137,7 @@ IMPORTANT CODE SNIPPET REQUIREMENTS:
 - For CSP headers, provide complete Content-Security-Policy header examples
 - For JSON-LD, provide complete schema.org structured data examples including Organization, WebSite, and relevant types
 - For performance, provide specific CSS/JS optimization examples
+- For agentReadiness: provide SEO meta tags, robots.txt examples, sitemap.xml format, OpenGraph tags
 - All code snippets must be production-ready and copy-pasteable
 
 Example CSP header:
@@ -150,6 +155,15 @@ Example JSON-LD for Organization:
     "telephone": "+353-1-234-5678",
     "contactType": "customer service"
   }
+}
+
+Example agentReadiness recommendation structure:
+{
+  "pillar": "agentReadiness",
+  "title": "Add Meta Description for Better Search Visibility",
+  "description": "Your pages are missing meta descriptions, which help search engines and AI agents understand your content.",
+  "severity": "High",
+  "exampleHtml": "<meta name='description' content='Professional web services in Ireland specializing in website optimization and digital transformation. Contact us for a free consultation.'>"
 }
 
 For EAA compliance (European Accessibility Act - deadline June 28, 2025), map WCAG violations to EAA requirements where relevant. Note which violations are critical for EAA compliance.`;
