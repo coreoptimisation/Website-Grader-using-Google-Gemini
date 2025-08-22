@@ -49,7 +49,7 @@ export async function runAgentReadinessAudit(url: string): Promise<AgentReadines
   
   try {
     const page = await browser.newPage();
-    await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
     
     // Check robots.txt
     const robotsResult = await checkRobotsTxt(baseUrl);

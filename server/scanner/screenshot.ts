@@ -28,7 +28,7 @@ export async function captureScreenshot(url: string, scanId: string): Promise<Sc
     
     // Navigate to the page
     await page.goto(url, { 
-      waitUntil: "networkidle", 
+      waitUntil: "domcontentloaded", 
       timeout: 30000 
     });
     
