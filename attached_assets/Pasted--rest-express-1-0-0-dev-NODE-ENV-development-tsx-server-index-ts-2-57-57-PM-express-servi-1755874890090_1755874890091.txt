@@ -1,0 +1,30 @@
+
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index.ts
+
+2:57:57 PM [express] serving on port 5000
+Browserslist: browsers data (caniuse-lite) is 10 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2:58:00 PM [express] GET /api/scans 200 in 211ms :: [{"id":"20435a36-ea9f-4fde-af78-95b1202465ef","u…
+2:58:00 PM [express] GET /api/scans 200 in 39ms :: [{"id":"20435a36-ea9f-4fde-af78-95b1202465ef","ur…
+2:59:43 PM [express] GET /api/scans 304 in 2546ms :: [{"id":"20435a36-ea9f-4fde-af78-95b1202465ef","…
+2:59:51 PM [express] POST /api/scans 200 in 53ms :: {"scanId":"688a2830-2138-46e9-915e-ad228a6b0196"…
+Starting complete scan for: https://www.coreoptimisation.com/
+2:59:52 PM [express] GET /api/scans 200 in 45ms :: [{"id":"688a2830-2138-46e9-915e-ad228a6b0196","ur…
+2:59:52 PM [express] GET /api/scans/688a2830-2138-46e9-915e-ad228a6b0196 200 in 288ms :: {"scan":{"i…
+Gemini analysis failed: GoogleGenerativeAIFetchError: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [503 Service Unavailable] The model is overloaded. Please try again later.
+    at handleResponseNotOk (file:///home/runner/workspace/node_modules/@google/generative-ai/dist/index.mjs:432:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async makeRequest (file:///home/runner/workspace/node_modules/@google/generative-ai/dist/index.mjs:401:9)
+    at async generateContent (file:///home/runner/workspace/node_modules/@google/generative-ai/dist/index.mjs:865:22)
+    at async analyzeWebsiteFindings (/home/runner/workspace/server/gemini.ts:164:20)
+    at async processScan (/home/runner/workspace/server/routes.ts:156:24) {
+  status: 503,
+  statusText: 'Service Unavailable',
+  errorDetails: undefined
+}
+Gemini analysis failed, using fallback values: Error: Failed to analyze website findings: Error: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [503 Service Unavailable] The model is overloaded. Please try again later.
+    at analyzeWebsiteFindings (/home/runner/workspace/server/gemini.ts:236:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async processScan (/home/runner/workspace/server/routes.ts:156:24)
