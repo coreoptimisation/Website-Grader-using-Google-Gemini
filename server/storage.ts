@@ -84,12 +84,23 @@ export class DatabaseStorage implements IStorage {
       .where(eq(scans.id, id));
   }
 
-  async getRecentScans(limit = 10): Promise<Scan[]> {
-    return db
-      .select()
+  async getRecentScans(limit = 10): Promise<any[]> {
+    const scansWithReports = await db
+      .select({
+        id: scans.id,
+        url: scans.url,
+        status: scans.status,
+        createdAt: scans.createdAt,
+        completedAt: scans.completedAt,
+        overallScore: scanReports.overallScore,
+        grade: scanReports.grade
+      })
       .from(scans)
+      .leftJoin(scanReports, eq(scans.id, scanReports.scanId))
       .orderBy(desc(scans.createdAt))
       .limit(limit);
+    
+    return scansWithReports;
   }
 
   async createScanResult(result: InsertScanResult): Promise<ScanResult> {

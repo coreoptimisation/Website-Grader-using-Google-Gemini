@@ -165,7 +165,7 @@ export default function Dashboard() {
               <h3 className="text-lg font-semibold text-slate-900 mb-4">All Scan History</h3>
               {recentScans && (recentScans as any).length > 0 ? (
                 <div className="space-y-3">
-                  {(recentScans as any).map((scan: ScanData) => (
+                  {(recentScans as any).map((scan: any) => (
                     <div 
                       key={scan.id} 
                       className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer"
@@ -181,15 +181,29 @@ export default function Dashboard() {
                           {new Date(scan.createdAt).toLocaleDateString()} at {new Date(scan.createdAt).toLocaleTimeString()}
                         </p>
                       </div>
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        scan.status === 'completed' 
-                          ? 'bg-green-100 text-green-800' 
-                          : scan.status === 'failed'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-blue-100 text-blue-800'
-                      }`}>
-                        {scan.status}
-                      </span>
+                      <div className="flex items-center gap-3">
+                        {scan.overallScore !== null && (
+                          <div className="text-right">
+                            <div className="text-2xl font-bold text-slate-900">{scan.overallScore}</div>
+                            <div className={`text-xs font-medium ${
+                              scan.grade === 'A' ? 'text-green-600' :
+                              scan.grade === 'B' ? 'text-blue-600' :
+                              scan.grade === 'C' ? 'text-yellow-600' :
+                              scan.grade === 'D' ? 'text-orange-600' :
+                              'text-red-600'
+                            }`}>Grade {scan.grade}</div>
+                          </div>
+                        )}
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          scan.status === 'completed' 
+                            ? 'bg-green-100 text-green-800' 
+                            : scan.status === 'failed'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {scan.status}
+                        </span>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -229,7 +243,7 @@ export default function Dashboard() {
                   <h3 className="text-lg font-semibold text-slate-900 mb-4">Recent Scans</h3>
                   {recentScans && (recentScans as any).length > 0 ? (
                     <div className="space-y-3">
-                      {(recentScans as any).map((scan: ScanData) => (
+                      {(recentScans as any).map((scan: any) => (
                         <div 
                           key={scan.id} 
                           className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer"
@@ -242,15 +256,29 @@ export default function Dashboard() {
                               {new Date(scan.createdAt).toLocaleDateString()}
                             </p>
                           </div>
-                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                            scan.status === 'completed' 
-                              ? 'bg-green-100 text-green-800' 
-                              : scan.status === 'failed'
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-blue-100 text-blue-800'
-                          }`}>
-                            {scan.status}
-                          </span>
+                          <div className="flex items-center gap-3">
+                            {scan.overallScore !== null && (
+                              <div className="text-right">
+                                <div className="text-xl font-bold text-slate-900">{scan.overallScore}</div>
+                                <div className={`text-xs font-medium ${
+                                  scan.grade === 'A' ? 'text-green-600' :
+                                  scan.grade === 'B' ? 'text-blue-600' :
+                                  scan.grade === 'C' ? 'text-yellow-600' :
+                                  scan.grade === 'D' ? 'text-orange-600' :
+                                  'text-red-600'
+                                }`}>Grade {scan.grade}</div>
+                              </div>
+                            )}
+                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                              scan.status === 'completed' 
+                                ? 'bg-green-100 text-green-800' 
+                                : scan.status === 'failed'
+                                ? 'bg-red-100 text-red-800'
+                                : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {scan.status}
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>
