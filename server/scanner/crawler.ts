@@ -208,8 +208,8 @@ export class WebCrawler {
       const lower = url.toLowerCase();
       const path = lower.split('/').filter(Boolean);
       
-      // 1. Homepage - highest priority
-      if (url.endsWith('/') || url === this.domain || path.length <= 1) {
+      // 1. Homepage - highest priority (but not other pages ending in /)
+      if ((url.endsWith('/') && path.length <= 1) || url === this.domain) {
         return { url, type: "homepage" as const, priority: 10 };
       }
       
