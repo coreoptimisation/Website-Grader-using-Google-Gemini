@@ -165,7 +165,10 @@ async function detectBookingSystem(url: string): Promise<BookingSystemDetails> {
   
   try {
     const { chromium } = await import('playwright');
-    browser = await chromium.launch({ headless: true });
+    browser = await chromium.launch({ 
+      headless: true,
+      executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium'
+    });
     page = await browser.newPage();
     await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
     
