@@ -330,7 +330,7 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
       // Run visual analysis in parallel with main analysis
       const [mainAnalysis, visualInsights] = await Promise.all([
         analyzeWebsiteFindings(summarizedEvidence),
-        screenshotPath ? analyzeScreenshot(screenshotPath, evidence.url) : Promise.resolve(null)
+        screenshotPath ? analyzeScreenshot(screenshotPath, summarizedEvidence.url) : Promise.resolve(null)
       ]);
       
       geminiAnalysis = mainAnalysis;
@@ -376,7 +376,13 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
       };
       
       // Generate real Agent Action Blueprint from scan data
-      const agentBlueprint = generateAgentActionBlueprint(
+      const agentBlueprint = isMultiPage ? {
+        totalActions: 0,
+        summary: "Multi-page scan completed",
+        criticalCount: (scanResult as any).siteWideSummary?.criticalIssues || 0,
+        automationPotential: 75,
+        actions: []
+      } : generateAgentActionBlueprint(
         evidence.accessibility,
         evidence.performance,
         evidence.security,
@@ -404,9 +410,12 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
         executiveSummary: `Your website achieved an overall score of ${overallScore} (${grade}). ${agentBlueprint.summary}`,
         technicalSummary: `Scan completed successfully. ${agentBlueprint.criticalCount} critical issues found. ${agentBlueprint.automationPotential}% of actions can be automated.`,
         eaaCompliance: {
-          compliant: evidence.accessibility.score >= 90,
-          criticalIssues: evidence.accessibility.criticalViolations > 0 ? 
-            [`${evidence.accessibility.criticalViolations} critical accessibility violations found`] : [],
+          compliant: scores.accessibility >= 90,
+          criticalIssues: isMultiPage ? 
+            ((scanResult as any).siteWideSummary?.criticalIssues > 0 ? 
+              [`${(scanResult as any).siteWideSummary?.criticalIssues} critical issues found across site`] : []) :
+            (evidence.accessibility.criticalViolations > 0 ? 
+              [`${evidence.accessibility.criticalViolations} critical accessibility violations found`] : []),
           deadline: "June 28, 2025",
           recommendations: ["Review accessibility scan results for EAA compliance"]
         },
