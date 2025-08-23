@@ -288,7 +288,22 @@ export default function Dashboard() {
               {/* Results Dashboard */}
               {isCompleted && activeScanData && (
                 <>
-                  {/* Check if we have multi-page scan data and show it first */}
+                  {/* Show Overall Grade and PillarScores first for multi-page scans (when not viewing individual page) */}
+                  {!isViewingIndividualPage && (() => {
+                    const multiPageData = Array.isArray(scanEvidence) ? scanEvidence?.find((e: any) => e.type === 'multi_page_scan')?.data : null;
+                    if (multiPageData) {
+                      // For multi-page scans, show Overall Grade and Pillar Scores at the top
+                      return (
+                        <>
+                          <OverallScore report={(activeScanData as any).report} results={(activeScanData as any).results} />
+                          <PillarScores results={(activeScanData as any).results} />
+                        </>
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  {/* Then show the multi-page scan results cards */}
                   {(() => {
                     const multiPageData = Array.isArray(scanEvidence) ? scanEvidence?.find((e: any) => e.type === 'multi_page_scan')?.data : null;
                     if (multiPageData) {
@@ -297,7 +312,7 @@ export default function Dashboard() {
                     return null;
                   })()}
                   
-                  {/* Only show the detailed analysis components when not viewing an individual page */}
+                  {/* Show remaining detailed analysis components when not viewing an individual page */}
                   {!isViewingIndividualPage && (() => {
                     // Check if we need to aggregate multi-page data
                     const accessibilityRawData = (activeScanData as any).results?.find((r: any) => r.pillar === 'accessibility')?.rawData;
@@ -314,10 +329,18 @@ export default function Dashboard() {
                       aggregatedData = aggregateMultiPageData(accessibilityRawData);
                     }
                     
+                    // For single-page scans, show all components; for multi-page, skip the already-shown ones
+                    const multiPageData = Array.isArray(scanEvidence) ? scanEvidence?.find((e: any) => e.type === 'multi_page_scan')?.data : null;
+                    
                     return (
                       <>
-                        <PillarScores results={(activeScanData as any).results} />
-                        <OverallScore report={(activeScanData as any).report} results={(activeScanData as any).results} />
+                        {/* Only show these for single-page scans (they're already shown above for multi-page) */}
+                        {!multiPageData && (
+                          <>
+                            <PillarScores results={(activeScanData as any).results} />
+                            <OverallScore report={(activeScanData as any).report} results={(activeScanData as any).results} />
+                          </>
+                        )}
                         {activeScanId && <ScreenshotViewer scanId={activeScanId} evidence={scanEvidence as any} />}
                         <VisualInsights insights={(activeScanData as any)?.report?.geminiAnalysis?.visualInsights} />
                         <AccessibilityDetails 
