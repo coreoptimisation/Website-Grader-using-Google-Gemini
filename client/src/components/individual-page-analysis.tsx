@@ -167,28 +167,22 @@ export default function IndividualPageAnalysis({ pageData, onBack, evidence, sca
       <PillarScores results={pillarResults} />
       
       {/* Screenshots for this page */}
-      {evidence && scanId && (
+      {pageData.screenshot?.filePath && (
         <Card>
           <CardHeader>
             <CardTitle>Page Screenshots</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4">
-              {evidence
-                .filter((e: any) => e.type === 'screenshot' && e.data?.url === pageData.url)
-                .map((screenshot: any, index: number) => (
-                  <div key={index} className="space-y-2">
-                    <p className="text-sm text-muted-foreground">
-                      {screenshot.data.device === 'desktop' ? 'Desktop View' : 'Mobile View'}
-                    </p>
-                    <img 
-                      src={`/api/scans/${scanId}/evidence/${screenshot.id}/file`}
-                      alt={`${screenshot.data.device} screenshot`}
-                      className="w-full rounded-lg border"
-                      loading="lazy"
-                    />
-                  </div>
-                ))}
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Full Page View</p>
+                <img 
+                  src={pageData.screenshot.filePath}
+                  alt="Page screenshot"
+                  className="w-full rounded-lg border"
+                  loading="lazy"
+                />
+              </div>
             </div>
           </CardContent>
         </Card>

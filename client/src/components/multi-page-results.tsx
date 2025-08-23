@@ -259,6 +259,18 @@ export function MultiPageResults({ data, evidence, scanId }: MultiPageResultsPro
                     </Button>
                   </div>
                   
+                  {/* Page Screenshot */}
+                  {page.screenshot?.filePath && (
+                    <div className="mb-4 rounded-lg overflow-hidden border">
+                      <img 
+                        src={page.screenshot.filePath}
+                        alt={`${page.pageType} screenshot`}
+                        className="w-full max-h-64 object-cover"
+                        loading="lazy"
+                      />
+                    </div>
+                  )}
+                  
                   {/* Page Scores */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div className="p-3 border rounded-lg">
