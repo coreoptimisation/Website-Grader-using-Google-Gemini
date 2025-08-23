@@ -20,6 +20,7 @@ export interface PageScanResult {
   security: any;
   agentReadiness: any;
   screenshot?: any;
+  overallScore?: number;
   ecommerceAnalysis?: {
     hasShoppingCart: boolean;
     hasCheckoutFlow: boolean;
@@ -100,6 +101,14 @@ export async function runMultiPageScan(
         ecommerceAnalysis = await analyzeEcommercePage(url, pageType, security);
       }
       
+      // Calculate overall score for this page
+      const overallScore = Math.round(
+        (accessibility.score || 0) * 0.3 +
+        (performance.score || 0) * 0.25 +
+        (security.score || 0) * 0.25 +
+        (agentReadiness.score || 0) * 0.2
+      );
+      
       pageResults.push({
         url,
         pageType,
@@ -108,7 +117,8 @@ export async function runMultiPageScan(
         security,
         agentReadiness,
         screenshot,
-        ecommerceAnalysis
+        ecommerceAnalysis,
+        overallScore
       });
     } catch (error) {
       console.error(`Failed to scan ${url}:`, error);
@@ -119,7 +129,8 @@ export async function runMultiPageScan(
         accessibility: { score: 0, error: true },
         performance: { score: 0, error: true },
         security: { score: 0, error: true },
-        agentReadiness: { score: 0, error: true }
+        agentReadiness: { score: 0, error: true },
+        overallScore: 0
       });
     }
   }
@@ -149,11 +160,13 @@ async function detectBookingSystem(url: string): Promise<BookingSystemDetails> {
     features: []
   };
   
-  const { chromium } = await import('playwright');
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage();
+  let browser;
+  let page;
   
   try {
+    const { chromium } = await import('playwright');
+    browser = await chromium.launch({ headless: true });
+    page = await browser.newPage();
     await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
     
     // Get page content and scripts
@@ -250,7 +263,13 @@ async function detectBookingSystem(url: string): Promise<BookingSystemDetails> {
   } catch (error) {
     console.error('Error detecting booking system:', error);
   } finally {
-    await browser.close();
+    if (browser) {
+      try {
+        await browser.close();
+      } catch (closeError) {
+        console.error('Error closing browser:', closeError);
+      }
+    }
   }
   
   return details;
@@ -286,8 +305,13 @@ async function analyzeEcommercePage(
   }
   if (pageType === "booking") {
     analysis.hasBookingSystem = true;
-    // Detect booking system details
-    analysis.bookingSystemDetails = await detectBookingSystem(url);
+    // Detect booking system details (non-blocking)
+    try {
+      analysis.bookingSystemDetails = await detectBookingSystem(url);
+    } catch (error) {
+      console.error('Failed to detect booking system details:', error);
+      // Continue without booking system details
+    }
   }
   if (pageType === "product") {
     analysis.hasProductCatalog = true;

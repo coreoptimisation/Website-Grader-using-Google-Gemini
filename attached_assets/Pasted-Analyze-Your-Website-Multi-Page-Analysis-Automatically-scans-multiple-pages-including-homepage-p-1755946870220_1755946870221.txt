@@ -1,0 +1,513 @@
+Analyze Your Website (Multi-Page Analysis)
+Automatically scans multiple pages including homepage, product pages, checkout/booking functionality, and more to provide comprehensive site-wide analysis.
+
+Website URL
+https://example.com
+Analyze Website
+
+
+Accessibility
+
+
+Performance
+
+
+Security
+
+
+Agent Ready
+Multi-Page Analysis Results
+Analyzed 7 pages across your website, including homepage, product pages, and checkout/booking functionality. The scores below represent weighted averages across all analyzed pages.
+
+Multi-Page Analysis Overview
+Pages Analyzed
+
+7
+
+Overall Score
+
+67%
+
+Critical Issues
+
+0
+
+Total Issues
+
+26
+
+Site-Wide Scores
+security
+58%
+performance
+68%
+accessibility
+57%
+agent Readiness
+93%
+E-commerce & Booking Analysis
+Booking System Detected
+Functionality Score
+
+0%
+
+Security Score
+
+0%
+
+Quick Access to Page Details
+booking
+•
+0%
+thegrafton.ie/book-direct-and-save-10-off/
+
+View Analysis
+homepage
+•
+0%
+thegrafton.ie/
+
+View Analysis
+homepage
+•
+0%
+thegrafton.ie/rooms-suites/
+
+View Analysis
+homepage
+•
+0%
+thegrafton.ie/rooms-suites/double-room/
+
+View Analysis
+homepage
+•
+0%
+thegrafton.ie/rooms-suites/classic-twin-room/
+
+View Analysis
+homepage
+•
+0%
+thegrafton.ie/rooms-suites/classic-king-room/
+
+View Analysis
+homepage
+•
+0%
+thegrafton.ie/rooms-suites/deluxe-king-room/
+
+View Analysis
+Page-by-Page Analysis
+
+booking
+
+homepage
+
+homepage
+
+homepage
+https://www.thegrafton.ie/book-direct-and-save-10-off/
+
+View Detailed Analysis
+Accessibility
+
+0%
+
+Performance
+
+0%
+
+Security
+
+0%
+
+SEO
+
+0%
+
+Site-Wide Summary
+Common Problems
+Accessibility issue "link-name" found on 6 pages
+Accessibility issue "region" found on 6 pages
+Accessibility issue "skip-link" found on 6 pages
+Accessibility issue "landmark-one-main" found on 4 pages
+Strengths
+Well-optimized for search engines and AI agents
+Accessibility
+40% weight
+57
+Poor performance
+
+axe-core violations:
+0
+WCAG AA level:
+Partial
+Trust
+20% weight
+58
+Poor performance
+
+Security headers:
+0/8
+Privacy policy:
+Missing
+Performance
+25% weight
+68
+Needs improvement
+
+Core Web Vitals:
+Failed
+Lighthouse score:
+68
+Agent Ready
+15% weight
+93
+Excellent
+
+Structured data:
+None
+Robots.txt:
+Invalid
+Overall Grade
+59
+Grade C
+The Grafton website, while offering a clear and well-indexed experience for AI agents, faces critical challenges in fundamental areas of web presence. The complete absence of HTTPS is a severe trust and security issue that must be addressed immediately. Accessibility also requires significant improvement to comply with basic standards and the upcoming European Accessibility Act. UX/Performance is average, with opportunities for optimization, but it's secondary to the critical security and accessibility concerns. The strong Agent Readiness score indicates the site is discoverable by search engines, but the core issues could deter users once they arrive.
+
+Weighted calculation:
+Accessibility (40%):
+22.8
+Trust (20%):
+11.6
+Performance (25%):
+17.0
+Agent Ready (15%):
+13.9
+Top 5 Impact Fixes
+1
+Implement HTTPS (SSL/TLS Certificate)
+The most critical issue is the lack of HTTPS encryption. This exposes user data and significantly erodes trust. Implementing an SSL certificate is paramount for security and credibility.
+
+Impact: High
+Effort: Medium
+Pillar: trust
+2
+Ensure all Links and Interactive Elements Have Accessible Names
+Many interactive elements lack accessible names, making them unusable for screen reader users. This is a fundamental accessibility barrier and a critical EAA compliance issue.
+
+Impact: High
+Effort: Low
+Pillar: accessibility
+3
+Implement Semantic Landmark Roles and a 'Skip to Content' Link
+Adding proper landmark roles and a 'skip to content' link drastically improves navigation for keyboard and screen reader users, addressing significant accessibility and EAA compliance points.
+
+Impact: High
+Effort: Low
+Pillar: accessibility
+4
+Add a Comprehensive Privacy Policy and Cookie Consent
+Legally required for EU websites, a clear Privacy Policy and Cookie Consent mechanism are crucial for building user trust and avoiding regulatory penalties.
+
+Impact: High
+Effort: Medium
+Pillar: trust
+5
+Optimize Images for Web Delivery
+Optimizing images by compressing them and serving them in appropriate sizes and modern formats will significantly reduce page load times and improve the overall user experience.
+
+Impact: Medium
+Effort: Medium
+Pillar: uxPerf
+Detailed Accessibility Checks
+
+Violations
+(6)
+Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds (Found on 3 pages)
+
+Elements must meet minimum color contrast ratio thresholds
+
+9 issues
+serious
+cat.color
+wcag2aa
+wcag143
+Ensure links have discernible text (Found on 6 pages)
+
+Links must have discernible text
+
+24 issues
+serious
+cat.name-role-value
+wcag2a
+wcag244
+Ensure all page content is contained by landmarks (Found on 6 pages)
+
+All page content should be contained by landmarks
+
+74 issues
+moderate
+cat.keyboard
+best-practice
+Ensure all skip links have a focusable target (Found on 6 pages)
+
+The skip-link target should exist and be focusable
+
+6 issues
+moderate
+cat.keyboard
+best-practice
+Ensure the order of headings is semantically correct
+
+Heading levels should only increase by one
+
+1 issue
+moderate
+cat.semantics
+best-practice
+Ensure the document has a main landmark (Found on 4 pages)
+
+Document should have one main landmark
+
+4 issues
+moderate
+cat.semantics
+best-practice
+
+Passed Checks
+(44)
+
+Needs Review
+(2)
+Powered by axe-core • WCAG 2.1 Level AA conformance testing
+
+Trust & Security Analysis
+Security Headers
+Strict-Transport-Security
+
+Add HSTS header to enforce HTTPS
+
+Content-Security-Policy
+
+undefined...
+
+Add CSP to prevent XSS attacks
+
+X-Content-Type-Options
+
+Add to prevent MIME sniffing
+
+X-Frame-Options
+
+Protect against clickjacking
+
+Referrer-Policy
+
+Control referrer information
+
+Permissions-Policy
+
+undefined...
+
+Control browser features
+
+SSL/TLS Configuration
+SSL Certificate
+
+Certificate validation status
+
+Certificate Expiry
+
+Check certificate expiration
+
+Protocol Version
+
+TLS version in use
+
+HTTPS Redirect
+
+No automatic HTTPS redirect
+
+Privacy & Compliance
+Privacy Policy
+
+No privacy policy detected
+
+Cookie Notice
+
+No cookie notice found
+
+Terms of Service
+
+Terms of service not found
+
+GDPR Compliance
+
+No GDPR compliance indicators
+
+Additional Security
+Mixed Content
+
+No mixed content issues
+
+Subresource Integrity
+
+No SRI protection for external resources
+
+DNS CAA Record
+
+No CAA DNS record
+
+Security.txt
+
+No security.txt file
+
+Security assessment based on OWASP guidelines and industry best practices. Implements defense-in-depth strategy.
+
+Performance Analysis
+Core Web Vitals
+LCP (Largest Contentful Paint)
+
+3.5s
+
+Main content loading speed
+
+FID (First Input Delay)
+
+158ms
+
+Interactivity responsiveness
+
+CLS (Cumulative Layout Shift)
+
+0.003
+
+Visual stability
+
+Loading Performance
+First Contentful Paint
+
+1.3s
+
+First visual response
+
+Speed Index
+
+N/A
+
+How quickly content loads
+
+Time to Interactive
+
+N/A
+
+When page becomes usable
+
+Resource Optimization
+Total Blocking Time
+
+N/A
+
+Main thread blocking
+
+Performance Score
+
+5800/100
+
+Overall performance rating
+
+Server Response Time
+
+204ms
+
+Initial server response
+
+Performance metrics measured using Lighthouse and Chrome User Experience Report. Lower values are better for most metrics.
+
+Agent Readiness Analysis
+SEO Optimization
+Title Tag
+
+Missing
+
+Meta Description
+
+Missing
+
+Canonical URL
+
+Not specified
+
+Open Graph Tags
+
+Missing
+
+Structured Data
+Schema.org Markup
+
+Not found
+
+JSON-LD
+
+Not found
+
+Microdata
+
+Not found
+
+Rich Snippets
+
+Not eligible
+
+Crawlability
+Robots.txt
+
+Missing
+
+Sitemap
+
+Not found
+
+Robots Meta
+
+Default (index, follow)
+
+URL Structure
+
+Complex URLs
+
+AI & Automation
+Content Structure
+
+Needs improvement
+
+API Availability
+
+No API found
+
+Machine Readable
+
+Not optimized
+
+Data Extraction
+
+Difficult
+
+Agent readiness score evaluates how well your site can be understood and processed by AI agents and automation tools.
+
+Detailed Recommendations
+Export PDF
+View Full Report
+
+accessibility Improvements
+3 issues
+
+trust Improvements
+3 issues
+
+uxPerf Improvements
+3 issues
+
+Agent Readiness Improvements
+3 issues
