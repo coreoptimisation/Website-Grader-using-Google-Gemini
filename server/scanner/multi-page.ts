@@ -4,6 +4,7 @@ import { runSecurityAudit } from "./security";
 import { runAgentReadinessAudit } from "./agent-readiness";
 import { captureScreenshot } from "./screenshot";
 import { WebCrawler } from "./crawler";
+import { PILLAR_WEIGHTS } from "../../shared/scoring";
 
 interface BookingSystemDetails {
   provider?: string;
@@ -391,12 +392,13 @@ function calculateAggregateScores(pageResults: PageScanResult[]) {
     overall: 0
   };
   
-  // Calculate overall score with pillar weights
+  // Calculate overall score with official pillar weights from shared/scoring.ts
+  // Using the same weights as the main scoring system to ensure consistency
   scores.overall = Math.round(
-    scores.accessibility * 0.3 +
-    scores.performance * 0.25 +
-    scores.security * 0.25 +
-    scores.agentReadiness * 0.2
+    scores.accessibility * PILLAR_WEIGHTS.accessibility +     // 40%
+    scores.security * PILLAR_WEIGHTS.trust +                  // 20%
+    scores.performance * PILLAR_WEIGHTS.uxPerf +              // 25%
+    scores.agentReadiness * PILLAR_WEIGHTS.agentReadiness     // 15%
   );
   
   return scores;
