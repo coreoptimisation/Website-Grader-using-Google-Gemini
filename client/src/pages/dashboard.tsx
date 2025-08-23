@@ -12,6 +12,7 @@ import AgentReadinessDetails from "@/components/agent-readiness-details";
 import PerformanceDetails from "@/components/performance-details";
 import TrustSecurityDetails from "@/components/trust-security-details";
 import ScreenshotViewer from "@/components/screenshot-viewer";
+import VisualInsights from "@/components/visual-insights";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -287,6 +288,7 @@ export default function Dashboard() {
                   <PillarScores results={(activeScanData as any).results} />
                   <OverallScore report={(activeScanData as any).report} results={(activeScanData as any).results} />
                   {activeScanId && <ScreenshotViewer scanId={activeScanId} evidence={scanEvidence as any} />}
+                  <VisualInsights insights={(activeScanData as any)?.report?.geminiAnalysis?.visualInsights} />
                   <AccessibilityDetails 
                     rawData={(activeScanData as any).results?.find((r: any) => r.pillar === 'accessibility')?.rawData}
                   />

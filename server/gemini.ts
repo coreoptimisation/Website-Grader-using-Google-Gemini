@@ -1,6 +1,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { generateAgentActionBlueprint } from "./scanner/agent-blueprint";
 import { calculateOverallScore, getGrade, getGradeExplanation, calculateTopFixes, PillarScores } from "../shared/scoring";
+import * as fs from "fs";
+import * as path from "path";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY || "");
 
@@ -98,6 +100,15 @@ export interface GeminiAnalysisResult {
   }>;
   overallGrade: string;
   gradeExplanation: string;
+  visualInsights?: {
+    designQuality: string;
+    colorContrast: string;
+    layoutIssues: string[];
+    visualAccessibility: string[];
+    brandingConsistency: string;
+    mobileResponsiveness: string;
+    suggestions: string[];
+  };
 }
 
 export async function analyzeWebsiteFindings(evidence: {
@@ -106,6 +117,7 @@ export async function analyzeWebsiteFindings(evidence: {
   performance: any;
   security: any;
   agentReadiness: any;
+  screenshotPath?: string;
 }): Promise<GeminiAnalysisResult> {
   const prompt = `You are grading an Irish SME/public-service website against Accessibility, Trust & Transparency, UX/Performance and Agent Readiness. 
 

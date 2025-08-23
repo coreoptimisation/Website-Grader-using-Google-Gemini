@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { runCompleteScan } from "./scanner";
 import { analyzeWebsiteFindings } from "./gemini";
+import { analyzeScreenshot } from "./gemini-visual";
 import { z } from "zod";
 import { calculateOverallScore, getGrade, getGradeExplanation } from "../shared/scoring";
 import { generateAgentActionBlueprint } from "./scanner/agent-blueprint";
@@ -187,8 +188,15 @@ async function processScan(scanId: string, url: string) {
     let overallScore;
     let grade;
     let gradeExplanation;
+    let visualAnalysis = null;
     
     try {
+      // Get screenshot path if available
+      let screenshotPath = null;
+      if (evidence.screenshot?.success && evidence.screenshot?.filePath) {
+        screenshotPath = evidence.screenshot.filePath;
+      }
+      
       // Send summarized data to reduce API token usage and avoid quota limits
       const summarizedEvidence = {
         url: evidence.url,
@@ -220,10 +228,18 @@ async function processScan(scanId: string, url: string) {
           score: evidence.agentReadiness.score,
           robots: evidence.agentReadiness.robots?.found || false,
           sitemaps: evidence.agentReadiness.sitemaps?.found || false
-        }
+        },
+        screenshotPath: screenshotPath
       };
       
-      geminiAnalysis = await analyzeWebsiteFindings(summarizedEvidence);
+      // Run visual analysis in parallel with main analysis
+      const [mainAnalysis, visualInsights] = await Promise.all([
+        analyzeWebsiteFindings(summarizedEvidence),
+        screenshotPath ? analyzeScreenshot(screenshotPath, evidence.url) : Promise.resolve(null)
+      ]);
+      
+      geminiAnalysis = mainAnalysis;
+      visualAnalysis = visualInsights;
       
       // Calculate weighted overall score using the shared scoring module
       overallScore = calculateOverallScore(geminiAnalysis.pillarScores);
@@ -300,7 +316,7 @@ async function processScan(scanId: string, url: string) {
       } as any;
     }
 
-    // Create scan report
+    // Create scan report with visual insights
     await storage.createScanReport({
       scanId,
       overallScore,
@@ -310,7 +326,8 @@ async function processScan(scanId: string, url: string) {
       geminiAnalysis: {
         ...geminiAnalysis,
         overallGrade: grade,
-        gradeExplanation
+        gradeExplanation,
+        visualInsights: visualAnalysis
       }
     });
 
