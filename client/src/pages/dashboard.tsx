@@ -13,6 +13,7 @@ import PerformanceDetails from "@/components/performance-details";
 import TrustSecurityDetails from "@/components/trust-security-details";
 import ScreenshotViewer from "@/components/screenshot-viewer";
 import VisualInsights from "@/components/visual-insights";
+import { MultiPageResults } from "@/components/multi-page-results";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -285,23 +286,36 @@ export default function Dashboard() {
               {/* Results Dashboard */}
               {isCompleted && activeScanData && (
                 <>
-                  <PillarScores results={(activeScanData as any).results} />
-                  <OverallScore report={(activeScanData as any).report} results={(activeScanData as any).results} />
-                  {activeScanId && <ScreenshotViewer scanId={activeScanId} evidence={scanEvidence as any} />}
-                  <VisualInsights insights={(activeScanData as any)?.report?.geminiAnalysis?.visualInsights} />
-                  <AccessibilityDetails 
-                    rawData={(activeScanData as any).results?.find((r: any) => r.pillar === 'accessibility')?.rawData}
-                  />
-                  <TrustSecurityDetails
-                    rawData={(activeScanData as any).results?.find((r: any) => r.pillar === 'trust')?.rawData}
-                  />
-                  <PerformanceDetails
-                    rawData={(activeScanData as any).results?.find((r: any) => r.pillar === 'performance')?.rawData}
-                  />
-                  <AgentReadinessDetails
-                    rawData={(activeScanData as any).results?.find((r: any) => r.pillar === 'agentReadiness')?.rawData}
-                  />
-                  <Recommendations report={(activeScanData as any).report} />
+                  {/* Check if we have multi-page scan data */}
+                  {(() => {
+                    const multiPageData = Array.isArray(scanEvidence) ? scanEvidence?.find((e: any) => e.type === 'multi_page_scan')?.data : null;
+                    if (multiPageData) {
+                      return <MultiPageResults data={multiPageData} />;
+                    } else {
+                      // Single-page results
+                      return (
+                        <>
+                          <PillarScores results={(activeScanData as any).results} />
+                          <OverallScore report={(activeScanData as any).report} results={(activeScanData as any).results} />
+                          {activeScanId && <ScreenshotViewer scanId={activeScanId} evidence={scanEvidence as any} />}
+                          <VisualInsights insights={(activeScanData as any)?.report?.geminiAnalysis?.visualInsights} />
+                          <AccessibilityDetails 
+                            rawData={(activeScanData as any).results?.find((r: any) => r.pillar === 'accessibility')?.rawData}
+                          />
+                          <TrustSecurityDetails
+                            rawData={(activeScanData as any).results?.find((r: any) => r.pillar === 'trust')?.rawData}
+                          />
+                          <PerformanceDetails
+                            rawData={(activeScanData as any).results?.find((r: any) => r.pillar === 'performance')?.rawData}
+                          />
+                          <AgentReadinessDetails
+                            rawData={(activeScanData as any).results?.find((r: any) => r.pillar === 'agentReadiness')?.rawData}
+                          />
+                          <Recommendations report={(activeScanData as any).report} />
+                        </>
+                      );
+                    }
+                  })()}
                 </>
               )}
 

@@ -3,6 +3,7 @@ import { runPerformanceAudit, PerformanceResult } from "./performance";
 import { runSecurityAudit, SecurityResult } from "./security";
 import { runAgentReadinessAudit, AgentReadinessResult } from "./agent-readiness";
 import { captureScreenshot, ScreenshotResult } from "./screenshot";
+import { runMultiPageScan, MultiPageScanResult } from "./multi-page";
 
 export interface ScanEvidence {
   url: string;
@@ -14,7 +15,17 @@ export interface ScanEvidence {
   timestamp: Date;
 }
 
-export async function runCompleteScan(url: string, scanId?: string): Promise<ScanEvidence> {
+export async function runCompleteScan(url: string, scanId?: string, multiPage: boolean = false): Promise<ScanEvidence | MultiPageScanResult> {
+  if (multiPage && scanId) {
+    // Run multi-page scan if requested
+    return await runMultiPageScan(url, scanId);
+  }
+  
+  // Otherwise run single page scan
+  return runSinglePageScan(url, scanId);
+}
+
+export async function runSinglePageScan(url: string, scanId?: string): Promise<ScanEvidence> {
   // Validate URL
   try {
     new URL(url);
@@ -49,3 +60,4 @@ export * from "./performance";
 export * from "./security";
 export * from "./agent-readiness";
 export * from "./screenshot";
+export * from "./multi-page";

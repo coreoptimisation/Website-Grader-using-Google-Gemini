@@ -10,7 +10,8 @@ import { generateAgentActionBlueprint } from "./scanner/agent-blueprint";
 
 const scanRequestSchema = z.object({
   url: z.string().url("Invalid URL format"),
-  userId: z.string().optional()
+  userId: z.string().optional(),
+  multiPage: z.boolean().optional().default(true) // Default to multi-page scanning
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -23,7 +24,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Start a new scan
   app.post("/api/scans", async (req, res) => {
     try {
-      const { url, userId } = scanRequestSchema.parse(req.body);
+      const { url, userId, multiPage } = scanRequestSchema.parse(req.body);
       
       // Create initial scan record
       const scan = await storage.createScan({ url, userId });
@@ -31,7 +32,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ scanId: scan.id, status: "pending" });
       
       // Start scanning process asynchronously
-      processScan(scan.id, url).catch(error => {
+      processScan(scan.id, url, multiPage).catch(error => {
         console.error(`Scan ${scan.id} failed:`, error);
         storage.updateScanStatus(scan.id, "failed");
       });
@@ -109,24 +110,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   return httpServer;
 }
 
-async function processScan(scanId: string, url: string) {
+async function processScan(scanId: string, url: string, multiPage: boolean = true) {
   try {
     // Update status to scanning
     await storage.updateScanStatus(scanId, "scanning");
     
     // Run complete scan with screenshot capture
-    const evidence = await runCompleteScan(url, scanId);
+    const scanResult = await runCompleteScan(url, scanId, multiPage);
     
-    // Store evidence
-    await storage.createScanEvidence({
-      scanId,
-      type: "complete_scan",
-      filePath: null,
-      data: evidence
-    });
+    // Check if it's a multi-page scan result
+    const isMultiPage = 'pageResults' in scanResult;
     
-    // Store screenshot evidence if captured successfully
-    if (evidence.screenshot?.success && evidence.screenshot?.filePath) {
+    // For single-page scan, use the result as evidence
+    const evidence = isMultiPage ? null : scanResult;
+    
+    // Store evidence based on scan type
+    if (isMultiPage) {
+      // Store multi-page scan result
+      await storage.createScanEvidence({
+        scanId,
+        type: "multi_page_scan",
+        filePath: null,
+        data: scanResult
+      });
+    } else {
+      // Store single-page evidence
+      await storage.createScanEvidence({
+        scanId,
+        type: "complete_scan",
+        filePath: null,
+        data: evidence
+      });
+    }
+    
+    // Store screenshot evidence if captured successfully (single-page)
+    if (!isMultiPage && evidence?.screenshot?.success && evidence?.screenshot?.filePath) {
       await storage.createScanEvidence({
         scanId,
         type: "screenshot",
@@ -147,36 +165,71 @@ async function processScan(scanId: string, url: string) {
     }
 
     // Create individual pillar results
-    const pillarResults = [
-      {
-        scanId,
-        pillar: "accessibility",
-        score: evidence.accessibility.score,
-        rawData: evidence.accessibility,
-        recommendations: []
-      },
-      {
-        scanId,
-        pillar: "performance",
-        score: evidence.performance.score,
-        rawData: evidence.performance,
-        recommendations: []
-      },
-      {
-        scanId,
-        pillar: "trust",
-        score: evidence.security.score,
-        rawData: evidence.security,
-        recommendations: []
-      },
-      {
-        scanId,
-        pillar: "agentReadiness",
-        score: evidence.agentReadiness.score,
-        rawData: evidence.agentReadiness,
-        recommendations: []
-      }
-    ];
+    let pillarResults;
+    if (isMultiPage) {
+      const multiPageResult = scanResult as any; // MultiPageScanResult
+      pillarResults = [
+        {
+          scanId,
+          pillar: "accessibility",
+          score: multiPageResult.aggregateScores.accessibility,
+          rawData: { multiPage: true, pageResults: multiPageResult.pageResults },
+          recommendations: []
+        },
+        {
+          scanId,
+          pillar: "performance",
+          score: multiPageResult.aggregateScores.performance,
+          rawData: { multiPage: true, pageResults: multiPageResult.pageResults },
+          recommendations: []
+        },
+        {
+          scanId,
+          pillar: "trust",
+          score: multiPageResult.aggregateScores.security,
+          rawData: { multiPage: true, pageResults: multiPageResult.pageResults },
+          recommendations: []
+        },
+        {
+          scanId,
+          pillar: "agentReadiness",
+          score: multiPageResult.aggregateScores.agentReadiness,
+          rawData: { multiPage: true, pageResults: multiPageResult.pageResults },
+          recommendations: []
+        }
+      ];
+    } else {
+      pillarResults = [
+        {
+          scanId,
+          pillar: "accessibility",
+          score: evidence.accessibility.score,
+          rawData: evidence.accessibility,
+          recommendations: []
+        },
+        {
+          scanId,
+          pillar: "performance",
+          score: evidence.performance.score,
+          rawData: evidence.performance,
+          recommendations: []
+        },
+        {
+          scanId,
+          pillar: "trust",
+          score: evidence.security.score,
+          rawData: evidence.security,
+          recommendations: []
+        },
+        {
+          scanId,
+          pillar: "agentReadiness",
+          score: evidence.agentReadiness.score,
+          rawData: evidence.agentReadiness,
+          recommendations: []
+        }
+      ];
+    }
 
     // Store pillar results
     await Promise.all(pillarResults.map(result => 
@@ -191,46 +244,88 @@ async function processScan(scanId: string, url: string) {
     let visualAnalysis = null;
     
     try {
-      // Get screenshot path if available
+      let summarizedEvidence;
       let screenshotPath = null;
-      if (evidence.screenshot?.success && evidence.screenshot?.filePath) {
-        screenshotPath = evidence.screenshot.filePath;
+      
+      if (isMultiPage) {
+        const multiPageResult = scanResult as any;
+        // For multi-page scan, use aggregate scores and summaries
+        summarizedEvidence = {
+          url: multiPageResult.primaryUrl,
+          multiPage: true,
+          pagesAnalyzed: multiPageResult.pagesAnalyzed,
+          accessibility: {
+            score: multiPageResult.aggregateScores.accessibility,
+            violations: multiPageResult.siteWideSummary?.totalIssues || 0,
+            criticalViolations: multiPageResult.siteWideSummary?.criticalIssues || 0,
+            topIssues: multiPageResult.siteWideSummary?.commonProblems || []
+          },
+          performance: {
+            score: multiPageResult.aggregateScores.performance,
+            opportunities: []
+          },
+          security: {
+            score: multiPageResult.aggregateScores.security,
+            https: multiPageResult.pageResults?.[0]?.security?.https || false,
+            vulnerabilities: []
+          },
+          agentReadiness: {
+            score: multiPageResult.aggregateScores.agentReadiness,
+            robots: true,
+            sitemaps: true
+          },
+          ecommerce: multiPageResult.ecommerceSummary,
+          sitewideSummary: multiPageResult.siteWideSummary
+        };
+        
+        // Use first page's screenshot if available
+        if (multiPageResult.pageResults?.[0]?.screenshot?.success) {
+          screenshotPath = multiPageResult.pageResults[0].screenshot.filePath;
+        }
+      } else {
+        // Single-page scan
+        if (evidence.screenshot?.success && evidence.screenshot?.filePath) {
+          screenshotPath = evidence.screenshot.filePath;
+        }
+        
+        // Send summarized data to reduce API token usage and avoid quota limits
+        summarizedEvidence = {
+          url: evidence.url,
+          multiPage: false,
+          pagesAnalyzed: 1,
+          accessibility: {
+            score: evidence.accessibility.score,
+            violations: evidence.accessibility.violations?.length || 0,
+            criticalViolations: evidence.accessibility.criticalViolations || 0,
+            topIssues: evidence.accessibility.violations?.slice(0, 3).map((v: any) => ({
+              id: v.id,
+              impact: v.impact,
+              help: v.help
+            })) || []
+          },
+          performance: {
+            score: evidence.performance.score,
+            fcp: evidence.performance.coreWebVitals?.fcp,
+            lcp: evidence.performance.coreWebVitals?.lcp,
+            opportunities: evidence.performance.opportunities?.slice(0, 3).map((o: any) => ({
+              title: o.title,
+              numericValue: o.numericValue
+            })) || []
+          },
+          security: {
+            score: evidence.security.score,
+            https: evidence.security.https,
+            vulnerabilities: evidence.security.vulnerabilities?.slice(0, 3) || []
+          },
+          agentReadiness: {
+            score: evidence.agentReadiness.score,
+            robots: evidence.agentReadiness.robots?.found || false,
+            sitemaps: evidence.agentReadiness.sitemaps?.found || false
+          }
+        };
       }
       
-      // Send summarized data to reduce API token usage and avoid quota limits
-      const summarizedEvidence = {
-        url: evidence.url,
-        accessibility: {
-          score: evidence.accessibility.score,
-          violations: evidence.accessibility.violations?.length || 0,
-          criticalViolations: evidence.accessibility.criticalViolations || 0,
-          topIssues: evidence.accessibility.violations?.slice(0, 3).map((v: any) => ({
-            id: v.id,
-            impact: v.impact,
-            help: v.help
-          })) || []
-        },
-        performance: {
-          score: evidence.performance.score,
-          fcp: evidence.performance.coreWebVitals?.fcp,
-          lcp: evidence.performance.coreWebVitals?.lcp,
-          opportunities: evidence.performance.opportunities?.slice(0, 3).map((o: any) => ({
-            title: o.title,
-            numericValue: o.numericValue
-          })) || []
-        },
-        security: {
-          score: evidence.security.score,
-          https: evidence.security.https,
-          vulnerabilities: evidence.security.vulnerabilities?.slice(0, 3) || []
-        },
-        agentReadiness: {
-          score: evidence.agentReadiness.score,
-          robots: evidence.agentReadiness.robots?.found || false,
-          sitemaps: evidence.agentReadiness.sitemaps?.found || false
-        },
-        screenshotPath: screenshotPath
-      };
+      summarizedEvidence.screenshotPath = screenshotPath;
       
       // Run visual analysis in parallel with main analysis
       const [mainAnalysis, visualInsights] = await Promise.all([
@@ -249,7 +344,12 @@ async function processScan(scanId: string, url: string) {
       console.error("Gemini analysis failed, using fallback values:", geminiError);
       
       // Use the actual scores from the scanners as fallback
-      const pillarScoresNumeric = {
+      const pillarScoresNumeric = isMultiPage ? {
+        accessibility: (scanResult as any).aggregateScores.accessibility,
+        trust: (scanResult as any).aggregateScores.security,
+        uxPerf: (scanResult as any).aggregateScores.performance,
+        agentReadiness: (scanResult as any).aggregateScores.agentReadiness
+      } : {
         accessibility: evidence.accessibility.score,
         trust: evidence.security.score,
         uxPerf: evidence.performance.score,
@@ -261,11 +361,18 @@ async function processScan(scanId: string, url: string) {
       gradeExplanation = getGradeExplanation(grade, overallScore);
       
       // Create fallback analysis with structure matching GeminiAnalysisResult
+      const scores = isMultiPage ? (scanResult as any).aggregateScores : {
+        accessibility: evidence.accessibility.score,
+        security: evidence.security.score,
+        performance: evidence.performance.score,
+        agentReadiness: evidence.agentReadiness.score
+      };
+      
       const pillarScores = {
-        accessibility: { score: evidence.accessibility.score, grade: getGrade(evidence.accessibility.score) },
-        trustAndSecurity: { score: evidence.security.score, grade: getGrade(evidence.security.score) },
-        performance: { score: evidence.performance.score, grade: getGrade(evidence.performance.score) },
-        agentReadiness: { score: evidence.agentReadiness.score, grade: getGrade(evidence.agentReadiness.score) }
+        accessibility: { score: scores.accessibility, grade: getGrade(scores.accessibility) },
+        trustAndSecurity: { score: scores.security, grade: getGrade(scores.security) },
+        performance: { score: scores.performance, grade: getGrade(scores.performance) },
+        agentReadiness: { score: scores.agentReadiness, grade: getGrade(scores.agentReadiness) }
       };
       
       // Generate real Agent Action Blueprint from scan data

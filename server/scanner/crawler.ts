@@ -1,0 +1,280 @@
+import { chromium, Browser, Page } from "playwright";
+import robotsParser from "robots-parser";
+import * as xml2js from "xml2js";
+
+export interface CrawlResult {
+  urls: string[];
+  sitemap?: string[];
+  ecommercePages: {
+    cart?: string;
+    checkout?: string;
+    products?: string[];
+    booking?: string;
+    payment?: string;
+    account?: string;
+  };
+  discoveredPages: {
+    url: string;
+    type: "homepage" | "product" | "cart" | "checkout" | "booking" | "contact" | "about" | "other";
+    priority: number;
+  }[];
+}
+
+export class WebCrawler {
+  private browser: Browser | null = null;
+  private visited = new Set<string>();
+  private maxPages = 10; // Limit to prevent excessive crawling
+  private domain: string = "";
+  
+  async crawl(startUrl: string): Promise<CrawlResult> {
+    try {
+      const url = new URL(startUrl);
+      this.domain = url.origin;
+      
+      // Launch browser
+      this.browser = await chromium.launch({ 
+        headless: true,
+        executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium'
+      });
+      
+      const result: CrawlResult = {
+        urls: [],
+        ecommercePages: {},
+        discoveredPages: []
+      };
+      
+      // Check robots.txt
+      const robotsAllowed = await this.checkRobotsTxt(url.origin);
+      if (!robotsAllowed) {
+        console.log("Crawling disallowed by robots.txt");
+      }
+      
+      // Try to get sitemap
+      const sitemapUrls = await this.parseSitemap(url.origin);
+      if (sitemapUrls.length > 0) {
+        result.sitemap = sitemapUrls;
+        result.urls = this.prioritizeUrls(sitemapUrls).slice(0, this.maxPages);
+      }
+      
+      // Crawl the start page and discover links
+      const page = await this.browser.newPage();
+      await page.goto(startUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+      
+      // Discover all links on the page
+      const links = await this.discoverLinks(page, startUrl);
+      
+      // Analyze and categorize pages
+      result.discoveredPages = this.categorizePages(links);
+      
+      // Identify ecommerce/booking pages
+      result.ecommercePages = this.identifyEcommercePages(result.discoveredPages);
+      
+      // If no sitemap, use discovered links
+      if (result.urls.length === 0) {
+        result.urls = result.discoveredPages
+          .sort((a, b) => b.priority - a.priority)
+          .slice(0, this.maxPages)
+          .map(p => p.url);
+      }
+      
+      // Always include the homepage
+      if (!result.urls.includes(startUrl)) {
+        result.urls.unshift(startUrl);
+      }
+      
+      await page.close();
+      
+      return result;
+      
+    } catch (error) {
+      console.error("Crawling error:", error);
+      return {
+        urls: [startUrl],
+        ecommercePages: {},
+        discoveredPages: [{ url: startUrl, type: "homepage", priority: 10 }]
+      };
+    } finally {
+      if (this.browser) {
+        await this.browser.close();
+      }
+    }
+  }
+  
+  private async checkRobotsTxt(origin: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${origin}/robots.txt`);
+      if (!response.ok) return true; // If no robots.txt, assume allowed
+      
+      const robotsTxt = await response.text();
+      const robots = robotsParser(`${origin}/robots.txt`, robotsTxt);
+      
+      // Check if our user agent is allowed
+      return robots.isAllowed(`${origin}/`, "Replit-Website-Grader") !== false;
+    } catch {
+      return true; // On error, assume allowed
+    }
+  }
+  
+  private async parseSitemap(origin: string): Promise<string[]> {
+    const urls: string[] = [];
+    
+    try {
+      // Try common sitemap locations
+      const sitemapUrls = [
+        `${origin}/sitemap.xml`,
+        `${origin}/sitemap_index.xml`,
+        `${origin}/sitemap.xml.gz`
+      ];
+      
+      for (const sitemapUrl of sitemapUrls) {
+        try {
+          const response = await fetch(sitemapUrl);
+          if (!response.ok) continue;
+          
+          const xml = await response.text();
+          const parser = new xml2js.Parser();
+          const result = await parser.parseStringPromise(xml);
+          
+          // Parse sitemap or sitemap index
+          if (result.urlset && result.urlset.url) {
+            for (const url of result.urlset.url) {
+              if (url.loc && url.loc[0]) {
+                urls.push(url.loc[0]);
+              }
+            }
+          } else if (result.sitemapindex && result.sitemapindex.sitemap) {
+            // Handle sitemap index
+            for (const sitemap of result.sitemapindex.sitemap) {
+              if (sitemap.loc && sitemap.loc[0]) {
+                // Recursively parse child sitemaps (limited)
+                const childUrls = await this.parseSitemap(sitemap.loc[0]);
+                urls.push(...childUrls.slice(0, 20)); // Limit child sitemap URLs
+              }
+            }
+          }
+          
+          if (urls.length > 0) break;
+        } catch (error) {
+          console.log(`Failed to parse sitemap at ${sitemapUrl}`);
+        }
+      }
+    } catch (error) {
+      console.error("Sitemap parsing error:", error);
+    }
+    
+    return urls;
+  }
+  
+  private async discoverLinks(page: Page, baseUrl: string): Promise<string[]> {
+    try {
+      const links = await page.evaluate(() => {
+        const anchors = document.querySelectorAll('a[href]');
+        return Array.from(anchors)
+          .map(a => (a as HTMLAnchorElement).href)
+          .filter(href => href && !href.startsWith('#') && !href.startsWith('javascript:'));
+      });
+      
+      // Filter to same domain only
+      const url = new URL(baseUrl);
+      return links.filter(link => {
+        try {
+          const linkUrl = new URL(link);
+          return linkUrl.origin === url.origin;
+        } catch {
+          return false;
+        }
+      });
+    } catch (error) {
+      console.error("Link discovery error:", error);
+      return [];
+    }
+  }
+  
+  private categorizePages(urls: string[]): CrawlResult['discoveredPages'] {
+    return urls.map(url => {
+      const lower = url.toLowerCase();
+      
+      // Detect page type based on URL patterns
+      if (lower.includes('/cart') || lower.includes('/basket') || lower.includes('/bag')) {
+        return { url, type: "cart" as const, priority: 9 };
+      }
+      if (lower.includes('/checkout') || lower.includes('/payment') || lower.includes('/pay')) {
+        return { url, type: "checkout" as const, priority: 10 };
+      }
+      if (lower.includes('/book') || lower.includes('/reservation') || lower.includes('/appointment')) {
+        return { url, type: "booking" as const, priority: 9 };
+      }
+      if (lower.includes('/product') || lower.includes('/item') || lower.includes('/shop') || lower.includes('/store')) {
+        return { url, type: "product" as const, priority: 7 };
+      }
+      if (lower.includes('/contact') || lower.includes('/support')) {
+        return { url, type: "contact" as const, priority: 6 };
+      }
+      if (lower.includes('/about')) {
+        return { url, type: "about" as const, priority: 5 };
+      }
+      if (url.endsWith('/') || url === this.domain) {
+        return { url, type: "homepage" as const, priority: 8 };
+      }
+      
+      return { url, type: "other" as const, priority: 3 };
+    });
+  }
+  
+  private identifyEcommercePages(pages: CrawlResult['discoveredPages']): CrawlResult['ecommercePages'] {
+    const ecommerce: CrawlResult['ecommercePages'] = {};
+    
+    for (const page of pages) {
+      switch (page.type) {
+        case "cart":
+          if (!ecommerce.cart) ecommerce.cart = page.url;
+          break;
+        case "checkout":
+          if (!ecommerce.checkout) ecommerce.checkout = page.url;
+          break;
+        case "booking":
+          if (!ecommerce.booking) ecommerce.booking = page.url;
+          break;
+        case "product":
+          if (!ecommerce.products) ecommerce.products = [];
+          if (ecommerce.products.length < 3) {
+            ecommerce.products.push(page.url);
+          }
+          break;
+      }
+      
+      // Also check for account/payment pages
+      const lower = page.url.toLowerCase();
+      if ((lower.includes('/account') || lower.includes('/login')) && !ecommerce.account) {
+        ecommerce.account = page.url;
+      }
+      if (lower.includes('/payment') && !ecommerce.payment) {
+        ecommerce.payment = page.url;
+      }
+    }
+    
+    return ecommerce;
+  }
+  
+  private prioritizeUrls(urls: string[]): string[] {
+    // Prioritize important pages
+    const prioritized = urls.map(url => {
+      const lower = url.toLowerCase();
+      let priority = 5;
+      
+      if (url.endsWith('/') || !url.includes('/', 8)) priority = 10; // Homepage
+      else if (lower.includes('checkout') || lower.includes('cart')) priority = 9;
+      else if (lower.includes('book') || lower.includes('reservation')) priority = 9;
+      else if (lower.includes('product') || lower.includes('shop')) priority = 8;
+      else if (lower.includes('contact') || lower.includes('about')) priority = 7;
+      else if (lower.includes('blog') || lower.includes('news')) priority = 4;
+      else if (lower.includes('privacy') || lower.includes('terms')) priority = 2;
+      
+      return { url, priority };
+    });
+    
+    return prioritized
+      .sort((a, b) => b.priority - a.priority)
+      .map(item => item.url);
+  }
+}

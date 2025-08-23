@@ -43,15 +43,15 @@ export default function ScanForm({ onScanStarted }: ScanFormProps) {
 
   const createScanMutation = useMutation({
     mutationFn: async (data: { url: string }) => {
-      const response = await apiRequest("POST", "/api/scans", data);
+      const response = await apiRequest("POST", "/api/scans", { ...data, multiPage: true });
       return response.json();
     },
     onSuccess: (data) => {
       onScanStarted(data.scanId);
       queryClient.invalidateQueries({ queryKey: ['/api/scans'] });
       toast({
-        title: "Scan Started",
-        description: "Your website analysis has begun. This may take a few minutes.",
+        title: "Multi-Page Scan Started",
+        description: "Analyzing multiple pages across your website including homepage, product pages, and checkout/booking functionality. This may take a few minutes.",
       });
       form.reset();
     },
@@ -71,7 +71,8 @@ export default function ScanForm({ onScanStarted }: ScanFormProps) {
 
   return (
     <Card className="p-6 mb-6" data-testid="scan-form">
-      <h3 className="text-lg font-semibold text-slate-900 mb-4">Analyse Your Website</h3>
+      <h3 className="text-lg font-semibold text-slate-900 mb-2">Analyze Your Website (Multi-Page Analysis)</h3>
+      <p className="text-sm text-slate-600 mb-4">Automatically scans multiple pages including homepage, product pages, checkout/booking functionality, and more to provide comprehensive site-wide analysis.</p>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <div className="flex space-x-4">
           <div className="flex-1">
@@ -98,9 +99,10 @@ export default function ScanForm({ onScanStarted }: ScanFormProps) {
               disabled={createScanMutation.isPending}
               className="px-6 py-3 font-medium"
               data-testid="button-start-scan"
+              title="Analyzes multiple pages including homepage, product pages, and checkout/booking functionality"
             >
               <Search className="w-4 h-4 mr-2" />
-              {createScanMutation.isPending ? "Starting..." : "Start Scan"}
+              {createScanMutation.isPending ? "Starting Multi-Page Scan..." : "Analyze Website"}
             </Button>
           </div>
         </div>
