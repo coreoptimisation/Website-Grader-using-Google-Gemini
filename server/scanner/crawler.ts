@@ -23,7 +23,7 @@ export interface CrawlResult {
 export class WebCrawler {
   private browser: Browser | null = null;
   private visited = new Set<string>();
-  private maxPages = 4; // Focus on the 4 critical pages only
+  private maxPages = 6; // Support mixed commerce: 6 pages for booking + ecommerce sites
   private domain: string = "";
   
   async crawl(startUrl: string): Promise<CrawlResult> {
@@ -197,9 +197,14 @@ export class WebCrawler {
         return { url, type: "homepage" as const, priority: 10 };
       }
       
-      // 2. Booking/Checkout Page - critical transaction pages
+      // 2a. Booking Pages - reservation/appointment systems
+      if (lower.includes('/book') || lower.includes('/reservation') || lower.includes('/appointment') ||
+          lower.includes('/reserve') || lower.includes('/booking')) {
+        return { url, type: "booking" as const, priority: 9 };
+      }
+      
+      // 2b. Ecommerce Checkout - shopping cart/payment systems
       if (lower.includes('/checkout') || lower.includes('/payment') || lower.includes('/pay') ||
-          lower.includes('/book') || lower.includes('/reservation') || lower.includes('/appointment') ||
           lower.includes('/cart') || lower.includes('/basket') || lower.includes('/bag')) {
         return { url, type: "checkout" as const, priority: 9 };
       }
@@ -234,7 +239,7 @@ export class WebCrawler {
       return { url, type: "other" as const, priority: 1 };
     });
     
-    // Filter and prioritize to get exactly the 4 critical page types
+    // Filter and prioritize to get up to 6 critical pages (supports mixed commerce)
     const prioritized = this.selectCriticalPages(pages);
     return prioritized;
   }
@@ -281,25 +286,36 @@ export class WebCrawler {
     const homepage = pages.find(p => p.type === "homepage");
     if (homepage) result.push(homepage);
     
-    // 2. Find best booking/checkout page
+    // 2. Find best booking page (reservation systems)
+    const bookingPages = pages.filter(p => p.type === "booking").sort((a, b) => b.priority - a.priority);
+    if (bookingPages.length > 0) result.push(bookingPages[0]);
+    
+    // 3. Find best ecommerce checkout page (shopping systems)
     const checkoutPages = pages.filter(p => p.type === "checkout").sort((a, b) => b.priority - a.priority);
     if (checkoutPages.length > 0) result.push(checkoutPages[0]);
     
-    // 3. Find main offerings page (highest priority product page)
+    // 4. Find main offerings page (highest priority product page)
     const productPages = pages.filter(p => p.type === "product").sort((a, b) => b.priority - a.priority);
     if (productPages.length > 0) {
       // Add the main offerings page (higher priority = more general)
       result.push(productPages[0]);
       
-      // 4. Add a specific detail page if available (lower priority = more specific)
+      // 5. Add a specific detail page if available (lower priority = more specific)
       const detailPage = productPages.reverse().find(p => p.priority === 7);
-      if (detailPage && result.length < 4) {
+      if (detailPage && result.length < 6) {
         result.push(detailPage);
       }
     }
     
-    // Fill remaining slots if we don't have 4 pages yet
-    while (result.length < 4 && pages.length > result.length) {
+    // 6. Add contact/about pages if we have space and mixed commerce
+    const hasMultipleCommerce = bookingPages.length > 0 && checkoutPages.length > 0;
+    if (hasMultipleCommerce && result.length < 6) {
+      const contactPage = pages.find(p => p.type === "contact");
+      if (contactPage) result.push(contactPage);
+    }
+    
+    // Fill remaining slots if we don't have 6 pages yet
+    while (result.length < 6 && pages.length > result.length) {
       const remaining = pages
         .filter(p => !result.some(r => r.url === p.url))
         .sort((a, b) => b.priority - a.priority);
@@ -310,6 +326,6 @@ export class WebCrawler {
       }
     }
     
-    return result.slice(0, 4); // Ensure exactly 4 pages max
+    return result.slice(0, 6); // Support up to 6 pages for mixed commerce sites
   }
 }

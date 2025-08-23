@@ -80,9 +80,9 @@ export async function runMultiPageScan(
   });
   console.log(`Found ecommerce pages:`, crawlResult.ecommercePages);
   
-  // Step 2: Scan each critical page (exactly 4 pages max)
+  // Step 2: Scan each critical page (up to 6 pages for mixed commerce)
   const pageResults: PageScanResult[] = [];
-  const maxPagesToScan = Math.min(crawlResult.urls.length, 4); // Scan exactly 4 critical pages
+  const maxPagesToScan = Math.min(crawlResult.urls.length, 6); // Support up to 6 pages for booking + ecommerce sites
   
   for (let i = 0; i < maxPagesToScan; i++) {
     const url = crawlResult.urls[i];
