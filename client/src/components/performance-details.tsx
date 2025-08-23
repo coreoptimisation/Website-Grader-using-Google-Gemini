@@ -8,7 +8,23 @@ interface PerformanceDetailsProps {
 export default function PerformanceDetails({ rawData }: PerformanceDetailsProps) {
   if (!rawData) return null;
   
-  const { lighthouseMetrics = {}, cruxMetrics = {} } = rawData;
+  // Extract metrics from the performance scanner data structure
+  const lighthouseMetrics = {
+    largestContentfulPaint: rawData.coreWebVitals?.lcp,
+    lcp: rawData.coreWebVitals?.lcp,
+    maxPotentialFID: rawData.coreWebVitals?.fid,
+    fid: rawData.coreWebVitals?.fid,
+    cumulativeLayoutShift: rawData.coreWebVitals?.cls,
+    cls: rawData.coreWebVitals?.cls,
+    firstContentfulPaint: rawData.coreWebVitals?.fcp,
+    fcp: rawData.coreWebVitals?.fcp,
+    speedIndex: rawData.metrics?.['speed-index']?.numericValue,
+    timeToInteractive: rawData.metrics?.['interactive']?.numericValue,
+    totalBlockingTime: rawData.metrics?.['total-blocking-time']?.numericValue,
+    serverResponseTime: rawData.coreWebVitals?.ttfb,
+    score: rawData.lighthouseScore || rawData.score
+  };
+  const cruxMetrics = rawData.cruxData || {};
   
   const getMetricStatus = (value: number, thresholds: { good: number, poor: number }) => {
     if (value <= thresholds.good) return 'good';
@@ -110,9 +126,9 @@ export default function PerformanceDetails({ rawData }: PerformanceDetailsProps)
             )}
             {renderMetric(
               'Time to Interactive',
-              lighthouseMetrics.interactive || lighthouseMetrics.tti,
+              lighthouseMetrics.timeToInteractive,
               's',
-              getMetricStatus(lighthouseMetrics.interactive || lighthouseMetrics.tti || 0, { good: 3800, poor: 7300 }),
+              getMetricStatus(lighthouseMetrics.timeToInteractive || 0, { good: 3800, poor: 7300 }),
               'When page becomes usable'
             )}
           </div>
@@ -127,9 +143,9 @@ export default function PerformanceDetails({ rawData }: PerformanceDetailsProps)
           <div className="grid grid-cols-3 gap-3">
             {renderMetric(
               'Total Blocking Time',
-              lighthouseMetrics.totalBlockingTime || lighthouseMetrics.tbt,
+              lighthouseMetrics.totalBlockingTime,
               's',
-              getMetricStatus(lighthouseMetrics.totalBlockingTime || lighthouseMetrics.tbt || 0, { good: 200, poor: 600 }),
+              getMetricStatus(lighthouseMetrics.totalBlockingTime || 0, { good: 200, poor: 600 }),
               'Main thread blocking'
             )}
             {renderMetric(
