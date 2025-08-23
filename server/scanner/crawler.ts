@@ -23,7 +23,7 @@ export interface CrawlResult {
 export class WebCrawler {
   private browser: Browser | null = null;
   private visited = new Set<string>();
-  private maxPages = 6; // Support mixed commerce: 6 pages for booking + ecommerce sites
+  private maxPages = 4; // Focus on 4 critical pages: homepage, shop, booking, detail
   private domain: string = "";
   
   async crawl(startUrl: string): Promise<CrawlResult> {
@@ -171,12 +171,16 @@ export class WebCrawler {
           .filter(href => href && !href.startsWith('#') && !href.startsWith('javascript:'));
       });
       
-      // Filter to same domain only
+      // Include same domain + known booking domains
       const url = new URL(baseUrl);
       return links.filter(link => {
         try {
           const linkUrl = new URL(link);
-          return linkUrl.origin === url.origin;
+          // Allow same domain
+          if (linkUrl.origin === url.origin) return true;
+          // Allow known booking domains
+          const bookingDomains = ['retailint-tickets.com', 'bookassist.com', 'vivaticket.com', 'p3hotels.com'];
+          return bookingDomains.some(domain => linkUrl.hostname.includes(domain));
         } catch {
           return false;
         }
@@ -197,25 +201,32 @@ export class WebCrawler {
         return { url, type: "homepage" as const, priority: 10 };
       }
       
-      // 2a. Booking Pages - reservation/appointment systems
+      // 2a. Shop Pages - highest priority after homepage
+      if (lower.includes('/shop') || lower.includes('/store')) {
+        return { url, type: "product" as const, priority: 9 };
+      }
+      
+      // 2b. Booking Pages - external domains or booking paths
       if (lower.includes('/book') || lower.includes('/reservation') || lower.includes('/appointment') ||
-          lower.includes('/reserve') || lower.includes('/booking')) {
+          lower.includes('/reserve') || lower.includes('/booking') || 
+          lower.includes('retailint-tickets.com') || lower.includes('bookassist.com') ||
+          lower.includes('vivaticket.com') || lower.includes('p3hotels.com')) {
         return { url, type: "booking" as const, priority: 9 };
       }
       
-      // 2b. Ecommerce Checkout - shopping cart/payment systems
+      // 2c. Ecommerce Checkout - shopping cart/payment systems
       if (lower.includes('/checkout') || lower.includes('/payment') || lower.includes('/pay') ||
           lower.includes('/cart') || lower.includes('/basket') || lower.includes('/bag')) {
-        return { url, type: "checkout" as const, priority: 9 };
+        return { url, type: "checkout" as const, priority: 8 };
       }
       
       // 3. Main Offerings Page - "shop window" pages (rooms, tours, tickets, services)
       if (lower.includes('/rooms') || lower.includes('/tours') || lower.includes('/tickets') ||
           lower.includes('/services') || lower.includes('/packages') || lower.includes('/experiences') ||
           lower.includes('/accommodations') || lower.includes('/activities') || lower.includes('/events') ||
-          lower.includes('/shop') || lower.includes('/store') || lower.includes('/catalog') ||
-          lower.includes('/offerings') || lower.includes('/suites') || lower.includes('/properties')) {
-        return { url, type: "product" as const, priority: 8 };
+          lower.includes('/catalog') || lower.includes('/offerings') || lower.includes('/suites') ||
+          lower.includes('/properties')) {
+        return { url, type: "product" as const, priority: 7 };
       }
       
       // 4. Specific Detail Page - individual product/service pages
@@ -239,7 +250,7 @@ export class WebCrawler {
       return { url, type: "other" as const, priority: 1 };
     });
     
-    // Filter and prioritize to get up to 6 critical pages (supports mixed commerce)
+    // Filter and prioritize to get exactly 4 critical pages (homepage, shop, booking, detail)
     const prioritized = this.selectCriticalPages(pages);
     return prioritized;
   }
@@ -286,46 +297,23 @@ export class WebCrawler {
     const homepage = pages.find(p => p.type === "homepage");
     if (homepage) result.push(homepage);
     
-    // 2. Find best booking page (reservation systems)
+    // 2. Find shop page (priority 9) - /shop, /store
+    const shopPages = pages.filter(p => p.type === "product" && p.priority === 9);
+    if (shopPages.length > 0) result.push(shopPages[0]);
+    
+    // 3. Find booking page (priority 9) - external domains or booking paths
     const bookingPages = pages.filter(p => p.type === "booking").sort((a, b) => b.priority - a.priority);
     if (bookingPages.length > 0) result.push(bookingPages[0]);
     
-    // 3. Find best ecommerce checkout page (shopping systems)
-    const checkoutPages = pages.filter(p => p.type === "checkout").sort((a, b) => b.priority - a.priority);
-    if (checkoutPages.length > 0) result.push(checkoutPages[0]);
+    // 4. Find best remaining page (detail page, checkout, or other offerings)
+    const remainingPages = pages
+      .filter(p => !result.some(r => r.url === p.url))
+      .sort((a, b) => b.priority - a.priority);
     
-    // 4. Find main offerings page (highest priority product page)
-    const productPages = pages.filter(p => p.type === "product").sort((a, b) => b.priority - a.priority);
-    if (productPages.length > 0) {
-      // Add the main offerings page (higher priority = more general)
-      result.push(productPages[0]);
-      
-      // 5. Add a specific detail page if available (lower priority = more specific)
-      const detailPage = productPages.reverse().find(p => p.priority === 7);
-      if (detailPage && result.length < 6) {
-        result.push(detailPage);
-      }
+    if (remainingPages.length > 0 && result.length < 4) {
+      result.push(remainingPages[0]);
     }
     
-    // 6. Add contact/about pages if we have space and mixed commerce
-    const hasMultipleCommerce = bookingPages.length > 0 && checkoutPages.length > 0;
-    if (hasMultipleCommerce && result.length < 6) {
-      const contactPage = pages.find(p => p.type === "contact");
-      if (contactPage) result.push(contactPage);
-    }
-    
-    // Fill remaining slots if we don't have 6 pages yet
-    while (result.length < 6 && pages.length > result.length) {
-      const remaining = pages
-        .filter(p => !result.some(r => r.url === p.url))
-        .sort((a, b) => b.priority - a.priority);
-      if (remaining.length > 0) {
-        result.push(remaining[0]);
-      } else {
-        break;
-      }
-    }
-    
-    return result.slice(0, 6); // Support up to 6 pages for mixed commerce sites
+    return result.slice(0, 4); // Limit to exactly 4 pages
   }
 }
