@@ -12,10 +12,27 @@ import { Badge } from "@/components/ui/badge";
 interface IndividualPageAnalysisProps {
   pageData: any;
   onBack: () => void;
+  evidence?: any[];
+  scanId?: string;
 }
 
-export default function IndividualPageAnalysis({ pageData, onBack }: IndividualPageAnalysisProps) {
+export default function IndividualPageAnalysis({ pageData, onBack, evidence, scanId }: IndividualPageAnalysisProps) {
   if (!pageData) return null;
+  
+  // Calculate overall score from individual pillar scores
+  const calculateOverallScore = () => {
+    const scores = [
+      pageData.accessibility?.score || 0,
+      pageData.security?.score || 0,
+      pageData.performance?.score || 0,
+      pageData.agentReadiness?.score || 0
+    ].filter(score => score > 0);
+    
+    if (scores.length === 0) return 0;
+    return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+  };
+  
+  const overallScore = pageData.overallScore || calculateOverallScore();
 
   const getPageTypeLabel = (pageType: string) => {
     switch (pageType) {
@@ -114,8 +131,8 @@ export default function IndividualPageAnalysis({ pageData, onBack }: IndividualP
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div>
               <p className="text-sm text-muted-foreground">Overall Score</p>
-              <p className={`text-2xl font-bold ${getScoreColor(pageData.overallScore || 0)}`}>
-                {pageData.overallScore || 0}%
+              <p className={`text-2xl font-bold ${getScoreColor(overallScore)}`}>
+                {overallScore}%
               </p>
             </div>
             <div>
@@ -148,6 +165,34 @@ export default function IndividualPageAnalysis({ pageData, onBack }: IndividualP
 
       {/* Pillar Scores */}
       <PillarScores results={pillarResults} />
+      
+      {/* Screenshots for this page */}
+      {evidence && scanId && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Page Screenshots</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4">
+              {evidence
+                .filter((e: any) => e.type === 'screenshot' && e.data?.url === pageData.url)
+                .map((screenshot: any, index: number) => (
+                  <div key={index} className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      {screenshot.data.device === 'desktop' ? 'Desktop View' : 'Mobile View'}
+                    </p>
+                    <img 
+                      src={`/api/scans/${scanId}/evidence/${screenshot.id}/file`}
+                      alt={`${screenshot.data.device} screenshot`}
+                      className="w-full rounded-lg border"
+                      loading="lazy"
+                    />
+                  </div>
+                ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Detailed Analysis Components */}
       <AccessibilityDetails rawData={pageData.accessibility} />
@@ -165,7 +210,7 @@ export default function IndividualPageAnalysis({ pageData, onBack }: IndividualP
             <div className="space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {Object.entries(pageData.ecommerceAnalysis).map(([key, value]) => {
-                  if (typeof value === 'boolean') {
+                  if (typeof value === 'boolean' && key !== 'bookingSystemDetails') {
                     return (
                       <div key={key} className="flex items-center gap-2">
                         <div className={`h-2 w-2 rounded-full ${value ? 'bg-green-500' : 'bg-gray-300'}`} />
@@ -178,6 +223,53 @@ export default function IndividualPageAnalysis({ pageData, onBack }: IndividualP
                   return null;
                 })}
               </div>
+              
+              {/* Booking System Details */}
+              {pageData.ecommerceAnalysis.bookingSystemDetails && (
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <h5 className="font-medium mb-3 text-blue-900">Booking System Details</h5>
+                  
+                  {pageData.ecommerceAnalysis.bookingSystemDetails.provider && (
+                    <div className="mb-2">
+                      <span className="text-sm font-medium text-blue-800">Provider: </span>
+                      <span className="text-sm text-blue-700">{pageData.ecommerceAnalysis.bookingSystemDetails.provider}</span>
+                    </div>
+                  )}
+                  
+                  {pageData.ecommerceAnalysis.bookingSystemDetails.platform && (
+                    <div className="mb-2">
+                      <span className="text-sm font-medium text-blue-800">Platform: </span>
+                      <span className="text-sm text-blue-700">{pageData.ecommerceAnalysis.bookingSystemDetails.platform}</span>
+                    </div>
+                  )}
+                  
+                  {pageData.ecommerceAnalysis.bookingSystemDetails.thirdParties?.length > 0 && (
+                    <div className="mb-2">
+                      <span className="text-sm font-medium text-blue-800">Third-Party Integrations:</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {pageData.ecommerceAnalysis.bookingSystemDetails.thirdParties.map((party: string, idx: number) => (
+                          <span key={idx} className="text-xs px-2 py-1 bg-white rounded border border-blue-300">
+                            {party}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {pageData.ecommerceAnalysis.bookingSystemDetails.features?.length > 0 && (
+                    <div>
+                      <span className="text-sm font-medium text-blue-800">Features Detected:</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {pageData.ecommerceAnalysis.bookingSystemDetails.features.map((feature: string, idx: number) => (
+                          <span key={idx} className="text-xs px-2 py-1 bg-green-100 rounded text-green-800">
+                            {feature}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               
               {pageData.ecommerceAnalysis.issues && pageData.ecommerceAnalysis.issues.length > 0 && (
                 <div>

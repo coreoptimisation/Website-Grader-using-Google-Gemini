@@ -291,7 +291,7 @@ export default function Dashboard() {
                   {(() => {
                     const multiPageData = Array.isArray(scanEvidence) ? scanEvidence?.find((e: any) => e.type === 'multi_page_scan')?.data : null;
                     if (multiPageData) {
-                      return <MultiPageResults data={multiPageData} />;
+                      return <MultiPageResults data={multiPageData} evidence={scanEvidence as any} scanId={activeScanId} />;
                     }
                     return null;
                   })()}

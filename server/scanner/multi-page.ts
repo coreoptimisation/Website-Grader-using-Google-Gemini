@@ -5,6 +5,13 @@ import { runAgentReadinessAudit } from "./agent-readiness";
 import { captureScreenshot } from "./screenshot";
 import { WebCrawler } from "./crawler";
 
+interface BookingSystemDetails {
+  provider?: string;
+  platform?: string;
+  thirdParties: string[];
+  features: string[];
+}
+
 export interface PageScanResult {
   url: string;
   pageType: string;
@@ -20,6 +27,7 @@ export interface PageScanResult {
     hasProductCatalog: boolean;
     hasBookingSystem: boolean;
     securePayment: boolean;
+    bookingSystemDetails?: BookingSystemDetails;
     trustSignals: string[];
     issues: string[];
   };
@@ -135,6 +143,119 @@ export async function runMultiPageScan(
   };
 }
 
+async function detectBookingSystem(url: string): Promise<BookingSystemDetails> {
+  const details: BookingSystemDetails = {
+    thirdParties: [],
+    features: []
+  };
+  
+  const { chromium } = await import('playwright');
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+  
+  try {
+    await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+    
+    // Get page content and scripts
+    const content = await page.content();
+    const scripts = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll('script')).map(s => s.src || s.innerHTML);
+    });
+    
+    const allContent = content + scripts.join(' ');
+    
+    // Detect booking system providers
+    const bookingProviders = [
+      { pattern: /bookassist/i, name: 'BookAssist' },
+      { pattern: /booking\.com/i, name: 'Booking.com' },
+      { pattern: /expedia/i, name: 'Expedia' },
+      { pattern: /cloudbeds/i, name: 'Cloudbeds' },
+      { pattern: /opera/i, name: 'Opera PMS' },
+      { pattern: /amadeus/i, name: 'Amadeus' },
+      { pattern: /sabre/i, name: 'Sabre' },
+      { pattern: /hotelogix/i, name: 'Hotelogix' },
+      { pattern: /littlehotelier/i, name: 'Little Hotelier' },
+      { pattern: /rezdy/i, name: 'Rezdy' },
+      { pattern: /checkfront/i, name: 'Checkfront' },
+      { pattern: /fareharbor/i, name: 'FareHarbor' },
+      { pattern: /opentable/i, name: 'OpenTable' },
+      { pattern: /resy/i, name: 'Resy' },
+      { pattern: /yelp.*reservations/i, name: 'Yelp Reservations' },
+      { pattern: /bookingengine/i, name: 'Generic Booking Engine' },
+      { pattern: /rezgo/i, name: 'Rezgo' },
+      { pattern: /trekksoft/i, name: 'TrekkSoft' },
+      { pattern: /guestline/i, name: 'Guestline' },
+      { pattern: /siteminder/i, name: 'SiteMinder' }
+    ];
+    
+    for (const provider of bookingProviders) {
+      if (provider.pattern.test(allContent)) {
+        details.provider = provider.name;
+        break;
+      }
+    }
+    
+    // Detect third-party integrations
+    const thirdPartyServices = [
+      { pattern: /google.*analytics/i, name: 'Google Analytics' },
+      { pattern: /google.*tag.*manager/i, name: 'Google Tag Manager' },
+      { pattern: /facebook.*pixel/i, name: 'Facebook Pixel' },
+      { pattern: /stripe/i, name: 'Stripe Payments' },
+      { pattern: /paypal/i, name: 'PayPal' },
+      { pattern: /square/i, name: 'Square Payments' },
+      { pattern: /adyen/i, name: 'Adyen' },
+      { pattern: /braintree/i, name: 'Braintree' },
+      { pattern: /mailchimp/i, name: 'Mailchimp' },
+      { pattern: /hubspot/i, name: 'HubSpot' },
+      { pattern: /tripadvisor/i, name: 'TripAdvisor' },
+      { pattern: /trustpilot/i, name: 'Trustpilot' },
+      { pattern: /hotjar/i, name: 'Hotjar' },
+      { pattern: /intercom/i, name: 'Intercom' },
+      { pattern: /zendesk/i, name: 'Zendesk' },
+      { pattern: /calendly/i, name: 'Calendly' },
+      { pattern: /twilio/i, name: 'Twilio' }
+    ];
+    
+    for (const service of thirdPartyServices) {
+      if (service.pattern.test(allContent)) {
+        details.thirdParties.push(service.name);
+      }
+    }
+    
+    // Detect booking features
+    const features = [
+      { pattern: /calendar|date.*picker/i, feature: 'Date Selection' },
+      { pattern: /availability|available/i, feature: 'Real-time Availability' },
+      { pattern: /guest.*count|occupancy/i, feature: 'Guest Management' },
+      { pattern: /room.*type|accommodation/i, feature: 'Room Selection' },
+      { pattern: /price|rate|cost/i, feature: 'Dynamic Pricing' },
+      { pattern: /payment|checkout/i, feature: 'Online Payment' },
+      { pattern: /confirmation|booking.*reference/i, feature: 'Booking Confirmation' },
+      { pattern: /cancel|modification/i, feature: 'Cancellation Policy' },
+      { pattern: /special.*request|preferences/i, feature: 'Special Requests' },
+      { pattern: /loyalty|rewards/i, feature: 'Loyalty Program' }
+    ];
+    
+    for (const item of features) {
+      if (item.pattern.test(allContent)) {
+        details.features.push(item.feature);
+      }
+    }
+    
+    // Check for custom-built systems
+    if (!details.provider && details.features.length > 3) {
+      details.platform = 'Custom Built';
+    }
+    
+  } catch (error) {
+    console.error('Error detecting booking system:', error);
+  } finally {
+    await browser.close();
+  }
+  
+  return details;
+}
+
 async function analyzeEcommercePage(
   url: string, 
   pageType: string,
@@ -165,6 +286,8 @@ async function analyzeEcommercePage(
   }
   if (pageType === "booking") {
     analysis.hasBookingSystem = true;
+    // Detect booking system details
+    analysis.bookingSystemDetails = await detectBookingSystem(url);
   }
   if (pageType === "product") {
     analysis.hasProductCatalog = true;

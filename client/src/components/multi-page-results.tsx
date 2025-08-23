@@ -9,9 +9,11 @@ import IndividualPageAnalysis from "@/components/individual-page-analysis";
 
 interface MultiPageResultsProps {
   data: any; // MultiPageScanResult from the backend
+  evidence?: any[];
+  scanId?: string;
 }
 
-export function MultiPageResults({ data }: MultiPageResultsProps) {
+export function MultiPageResults({ data, evidence, scanId }: MultiPageResultsProps) {
   const [selectedPage, setSelectedPage] = useState<any>(null);
   
   if (!data || !data.pageResults) {
@@ -24,6 +26,8 @@ export function MultiPageResults({ data }: MultiPageResultsProps) {
       <IndividualPageAnalysis 
         pageData={selectedPage} 
         onBack={() => setSelectedPage(null)}
+        evidence={evidence}
+        scanId={scanId}
       />
     );
   }
