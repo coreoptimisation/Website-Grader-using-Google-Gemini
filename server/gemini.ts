@@ -11,7 +11,7 @@ const model = genAI.getGenerativeModel({
   generationConfig: {
     responseMimeType: "application/json",
     responseSchema: {
-      type: "OBJECT" as any,
+      type: "object" as any,
       properties: {
         summary: { type: "string" },
         topFixes: { 
@@ -213,12 +213,13 @@ For EAA compliance (European Accessibility Act - deadline June 28, 2025), map WC
       
       // Return a fallback analysis if parsing completely fails
       return {
-        overallScore: 50,
+        summary: "Analysis Error",
+        topFixes: [],
         pillarScores: {
-          accessibility: { score: 50, grade: "C" },
-          trustAndSecurity: { score: 50, grade: "C" },
-          performance: { score: 50, grade: "C" },
-          agentReadiness: { score: 50, grade: "C" }
+          accessibility: 50,
+          trust: 50,
+          uxPerf: 50,
+          agentReadiness: 50
         },
         topImpactFixes: [
           {

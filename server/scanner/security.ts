@@ -45,7 +45,7 @@ export async function runSecurityAudit(url: string): Promise<SecurityResult> {
     const page = await browser.newPage();
     
     // Navigate and capture response headers
-    const response = await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+    const response = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
     
     if (!response) {
       throw new Error("Failed to load page");
