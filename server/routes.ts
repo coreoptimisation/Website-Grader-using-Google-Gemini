@@ -123,6 +123,25 @@ async function processScan(scanId: string, url: string) {
       filePath: null,
       data: evidence
     });
+    
+    // Store screenshot evidence if captured successfully
+    if (evidence.screenshot?.success && evidence.screenshot?.filePath) {
+      await storage.createScanEvidence({
+        scanId,
+        type: "screenshot",
+        filePath: evidence.screenshot.filePath,
+        data: evidence.screenshot
+      });
+      
+      // Also store viewport screenshot if it exists
+      const viewportPath = evidence.screenshot.filePath.replace('.png', '').replace('/screenshots/', '/screenshots/') + '_viewport.png';
+      await storage.createScanEvidence({
+        scanId,
+        type: "screenshot_viewport",
+        filePath: viewportPath,
+        data: { ...evidence.screenshot, fullPage: false }
+      });
+    }
 
     // Create individual pillar results
     const pillarResults = [

@@ -11,6 +11,7 @@ import AccessibilityDetails from "@/components/accessibility-details";
 import AgentReadinessDetails from "@/components/agent-readiness-details";
 import PerformanceDetails from "@/components/performance-details";
 import TrustSecurityDetails from "@/components/trust-security-details";
+import ScreenshotViewer from "@/components/screenshot-viewer";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +38,14 @@ export default function Dashboard() {
     // Ensure we get the final state
     refetchOnWindowFocus: true,
     staleTime: 1000
+  });
+  
+  const isScanning = (activeScanData as any)?.scan?.status === 'scanning';
+  const isCompleted = (activeScanData as any)?.scan?.status === 'completed';
+  
+  const { data: scanEvidence } = useQuery({
+    queryKey: ['/api/scans', activeScanId, 'evidence'],
+    enabled: !!activeScanId && isCompleted,
   });
 
   const handleScanStarted = (scanId: string) => {
@@ -71,9 +80,6 @@ export default function Dashboard() {
     }
   };
 
-  const isScanning = (activeScanData as any)?.scan?.status === 'scanning';
-  const isCompleted = (activeScanData as any)?.scan?.status === 'completed';
-  
   // When scan completes, invalidate queries to update the UI
   useEffect(() => {
     if (isCompleted && activeScanId) {
@@ -280,6 +286,7 @@ export default function Dashboard() {
                 <>
                   <PillarScores results={(activeScanData as any).results} />
                   <OverallScore report={(activeScanData as any).report} results={(activeScanData as any).results} />
+                  {activeScanId && <ScreenshotViewer scanId={activeScanId} evidence={scanEvidence as any} />}
                   <AccessibilityDetails 
                     rawData={(activeScanData as any).results?.find((r: any) => r.pillar === 'accessibility')?.rawData}
                   />
