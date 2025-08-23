@@ -23,6 +23,7 @@ import type { ScanData } from "@/lib/types";
 export default function Dashboard() {
   const [activeScanId, setActiveScanId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<'dashboard' | 'history'>('dashboard');
+  const [isViewingIndividualPage, setIsViewingIndividualPage] = useState(false);
   const { toast } = useToast();
 
   const { data: recentScans } = useQuery({
@@ -291,13 +292,13 @@ export default function Dashboard() {
                   {(() => {
                     const multiPageData = Array.isArray(scanEvidence) ? scanEvidence?.find((e: any) => e.type === 'multi_page_scan')?.data : null;
                     if (multiPageData) {
-                      return <MultiPageResults data={multiPageData} evidence={scanEvidence as any} scanId={activeScanId} />;
+                      return <MultiPageResults data={multiPageData} evidence={scanEvidence as any} scanId={activeScanId} onPageViewChange={setIsViewingIndividualPage} />;
                     }
                     return null;
                   })()}
                   
-                  {/* Always show the detailed analysis components */}
-                  {(() => {
+                  {/* Only show the detailed analysis components when not viewing an individual page */}
+                  {!isViewingIndividualPage && (() => {
                     // Check if we need to aggregate multi-page data
                     const accessibilityRawData = (activeScanData as any).results?.find((r: any) => r.pillar === 'accessibility')?.rawData;
                     const performanceRawData = (activeScanData as any).results?.find((r: any) => r.pillar === 'performance')?.rawData;

@@ -11,10 +11,16 @@ interface MultiPageResultsProps {
   data: any; // MultiPageScanResult from the backend
   evidence?: any[];
   scanId?: string;
+  onPageViewChange?: (isViewingPage: boolean) => void;
 }
 
-export function MultiPageResults({ data, evidence, scanId }: MultiPageResultsProps) {
+export function MultiPageResults({ data, evidence, scanId, onPageViewChange }: MultiPageResultsProps) {
   const [selectedPage, setSelectedPage] = useState<any>(null);
+  
+  // Notify parent when page view changes
+  React.useEffect(() => {
+    onPageViewChange?.(!!selectedPage);
+  }, [selectedPage, onPageViewChange]);
   
   if (!data || !data.pageResults) {
     return <div>No multi-page data available</div>;
