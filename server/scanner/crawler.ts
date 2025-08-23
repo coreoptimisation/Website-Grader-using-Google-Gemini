@@ -171,16 +171,26 @@ export class WebCrawler {
           .filter(href => href && !href.startsWith('#') && !href.startsWith('javascript:'));
       });
       
-      // Include same domain + known booking domains
+      // Include same domain + potential external booking/ecommerce domains
       const url = new URL(baseUrl);
       return links.filter(link => {
         try {
           const linkUrl = new URL(link);
-          // Allow same domain
+          // Always allow same domain
           if (linkUrl.origin === url.origin) return true;
-          // Allow known booking domains
-          const bookingDomains = ['retailint-tickets.com', 'bookassist.com', 'vivaticket.com', 'p3hotels.com'];
-          return bookingDomains.some(domain => linkUrl.hostname.includes(domain));
+          
+          // Allow external domains that match commerce patterns
+          const hostname = linkUrl.hostname.toLowerCase();
+          const commercePatterns = [
+            // Booking/reservation patterns
+            'book', 'reservation', 'reserve', 'ticket', 'appointment', 'booking',
+            // Ecommerce patterns  
+            'shop', 'store', 'cart', 'checkout', 'buy', 'order',
+            // Common platform indicators
+            'secure', 'payment', 'gateway'
+          ];
+          
+          return commercePatterns.some(pattern => hostname.includes(pattern));
         } catch {
           return false;
         }
@@ -201,16 +211,19 @@ export class WebCrawler {
         return { url, type: "homepage" as const, priority: 10 };
       }
       
-      // 2a. Shop Pages - highest priority after homepage
-      if (lower.includes('/shop') || lower.includes('/store')) {
+      // 2a. Ecommerce Pages - shopping, purchasing, products
+      if (lower.includes('/shop') || lower.includes('/store') || lower.includes('/buy') ||
+          lower.includes('/products') || lower.includes('/catalog') || lower.includes('/merchandise') ||
+          lower.includes('/gifts') || lower.includes('/retail')) {
         return { url, type: "product" as const, priority: 9 };
       }
       
-      // 2b. Booking Pages - external domains or booking paths
-      if (lower.includes('/book') || lower.includes('/reservation') || lower.includes('/appointment') ||
-          lower.includes('/reserve') || lower.includes('/booking') || 
-          lower.includes('retailint-tickets.com') || lower.includes('bookassist.com') ||
-          lower.includes('vivaticket.com') || lower.includes('p3hotels.com')) {
+      // 2b. Booking/Reservation Pages - any appointment or reservation system
+      if (lower.includes('/book') || lower.includes('/reservation') || lower.includes('/reserve') ||
+          lower.includes('/appointment') || lower.includes('/booking') || lower.includes('/schedule') ||
+          lower.includes('/tickets') || lower.includes('/register') || lower.includes('/enroll') ||
+          // External domain patterns for booking systems
+          this.isExternalBookingDomain(url)) {
         return { url, type: "booking" as const, priority: 9 };
       }
       
@@ -220,12 +233,15 @@ export class WebCrawler {
         return { url, type: "checkout" as const, priority: 8 };
       }
       
-      // 3. Main Offerings Page - "shop window" pages (rooms, tours, tickets, services)
-      if (lower.includes('/rooms') || lower.includes('/tours') || lower.includes('/tickets') ||
-          lower.includes('/services') || lower.includes('/packages') || lower.includes('/experiences') ||
-          lower.includes('/accommodations') || lower.includes('/activities') || lower.includes('/events') ||
-          lower.includes('/catalog') || lower.includes('/offerings') || lower.includes('/suites') ||
-          lower.includes('/properties')) {
+      // 3. Main Offerings Page - business service/product catalog pages
+      if (lower.includes('/services') || lower.includes('/offerings') || lower.includes('/packages') ||
+          lower.includes('/menu') || lower.includes('/treatments') || lower.includes('/classes') ||
+          lower.includes('/programs') || lower.includes('/courses') || lower.includes('/plans') ||
+          lower.includes('/categories') || lower.includes('/collection') || lower.includes('/gallery') ||
+          // Industry-specific patterns
+          lower.includes('/rooms') || lower.includes('/suites') || lower.includes('/accommodations') ||
+          lower.includes('/tours') || lower.includes('/experiences') || lower.includes('/activities') ||
+          lower.includes('/events') || lower.includes('/venues') || lower.includes('/facilities')) {
         return { url, type: "product" as const, priority: 7 };
       }
       
@@ -315,5 +331,21 @@ export class WebCrawler {
     }
     
     return result.slice(0, 4); // Limit to exactly 4 pages
+  }
+  
+  private isExternalBookingDomain(url: string): boolean {
+    try {
+      const hostname = new URL(url).hostname.toLowerCase();
+      const mainDomain = this.domain.replace('https://', '').replace('http://', '');
+      
+      // Skip if same domain
+      if (hostname.includes(mainDomain)) return false;
+      
+      // Check for booking/reservation patterns in external domains
+      const bookingPatterns = ['book', 'reservation', 'reserve', 'ticket', 'appointment', 'schedule'];
+      return bookingPatterns.some(pattern => hostname.includes(pattern));
+    } catch {
+      return false;
+    }
   }
 }
