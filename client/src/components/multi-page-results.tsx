@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { CheckCircle, XCircle, AlertCircle, ShoppingCart, Calendar, CreditCard, Package } from "lucide-react";
+import { CheckCircle, XCircle, AlertCircle, ShoppingCart, Calendar, CreditCard, Package, Globe } from "lucide-react";
 
 interface MultiPageResultsProps {
   data: any; // MultiPageScanResult from the backend
@@ -32,6 +32,22 @@ export function MultiPageResults({ data }: MultiPageResultsProps) {
 
   return (
     <div className="space-y-6">
+      {/* Multi-Page Analysis Header */}
+      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Globe className="h-5 w-5 text-blue-600" />
+            <CardTitle className="text-blue-900">Multi-Page Analysis Results</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-blue-800">
+            Analyzed {data.pagesAnalyzed} pages across your website, including homepage, product pages, and checkout/booking functionality.
+            The scores below represent weighted averages across all analyzed pages.
+          </p>
+        </CardContent>
+      </Card>
+      
       {/* Overview Card */}
       <Card>
         <CardHeader>
