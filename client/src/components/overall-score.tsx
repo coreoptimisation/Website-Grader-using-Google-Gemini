@@ -61,7 +61,7 @@ export default function OverallScore({ report, results }: OverallScoreProps) {
   };
 
   return (
-    <div className="grid grid-cols-3 gap-6 mb-6" data-testid="overall-score">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6" data-testid="overall-score">
       {/* Overall Score */}
       <Card className="p-6">
         <h3 className="text-lg font-semibold text-slate-900 mb-4">Overall Grade</h3>
@@ -100,7 +100,7 @@ export default function OverallScore({ report, results }: OverallScoreProps) {
       </Card>
       
       {/* Top 5 Impact Fixes */}
-      <div className="col-span-2">
+      <div className="lg:col-span-2">
         <Card className="p-6">
           <h3 className="text-lg font-semibold text-slate-900 mb-4">Top 5 Impact Fixes</h3>
           <div className="space-y-3">

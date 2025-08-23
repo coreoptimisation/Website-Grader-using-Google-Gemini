@@ -70,11 +70,11 @@ export default function ScanForm({ onScanStarted }: ScanFormProps) {
   };
 
   return (
-    <Card className="p-6 mb-6" data-testid="scan-form">
-      <h3 className="text-lg font-semibold text-slate-900 mb-2">Analyze Your Website (Multi-Page Analysis)</h3>
-      <p className="text-sm text-slate-600 mb-4">Automatically scans multiple pages including homepage, product pages, checkout/booking functionality, and more to provide comprehensive site-wide analysis.</p>
+    <Card className="p-4 sm:p-6 mb-6" data-testid="scan-form">
+      <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-2">Analyze Your Website (Multi-Page Analysis)</h3>
+      <p className="text-xs sm:text-sm text-slate-600 mb-4">Automatically scans multiple pages including homepage, product pages, checkout/booking functionality, and more to provide comprehensive site-wide analysis.</p>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <div className="flex space-x-4">
+        <div className="flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0">
           <div className="flex-1">
             <Label htmlFor="website-url" className="block text-sm font-medium text-slate-700 mb-2">
               Website URL
@@ -97,18 +97,19 @@ export default function ScanForm({ onScanStarted }: ScanFormProps) {
             <Button 
               type="submit" 
               disabled={createScanMutation.isPending}
-              className="px-6 py-3 font-medium"
+              className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 font-medium"
               data-testid="button-start-scan"
               title="Analyzes multiple pages including homepage, product pages, and checkout/booking functionality"
             >
               <Search className="w-4 h-4 mr-2" />
-              {createScanMutation.isPending ? "Starting Multi-Page Scan..." : "Analyze Website"}
+              <span className="hidden sm:inline">{createScanMutation.isPending ? "Starting Multi-Page Scan..." : "Analyze Website"}</span>
+              <span className="sm:hidden">{createScanMutation.isPending ? "Scanning..." : "Analyze"}</span>
             </Button>
           </div>
         </div>
         
         {/* Scan Options */}
-        <div className="grid grid-cols-4 gap-4 pt-4 border-t border-slate-200">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 pt-4 border-t border-slate-200">
           <div className="flex items-center space-x-2">
             <Checkbox 
               id="accessibility"
