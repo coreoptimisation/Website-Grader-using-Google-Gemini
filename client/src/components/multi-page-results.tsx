@@ -1,17 +1,31 @@
-import React from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { CheckCircle, XCircle, AlertCircle, ShoppingCart, Calendar, CreditCard, Package, Globe } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { CheckCircle, XCircle, AlertCircle, ShoppingCart, Calendar, CreditCard, Package, Globe, ExternalLink, FileText } from "lucide-react";
+import IndividualPageAnalysis from "@/components/individual-page-analysis";
 
 interface MultiPageResultsProps {
   data: any; // MultiPageScanResult from the backend
 }
 
 export function MultiPageResults({ data }: MultiPageResultsProps) {
+  const [selectedPage, setSelectedPage] = useState<any>(null);
+  
   if (!data || !data.pageResults) {
     return <div>No multi-page data available</div>;
+  }
+  
+  // If a page is selected, show its detailed analysis
+  if (selectedPage) {
+    return (
+      <IndividualPageAnalysis 
+        pageData={selectedPage} 
+        onBack={() => setSelectedPage(null)}
+      />
+    );
   }
 
   const getPageIcon = (pageType: string) => {
@@ -169,6 +183,45 @@ export function MultiPageResults({ data }: MultiPageResultsProps) {
         </Card>
       )}
 
+      {/* Quick Access to Individual Pages */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Quick Access to Page Details</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3">
+            {data.pageResults.map((page: any, index: number) => (
+              <div key={index} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                <div className="flex items-center gap-3 flex-1">
+                  {getPageIcon(page.pageType)}
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium capitalize">{page.pageType}</span>
+                      <span className="text-xs text-muted-foreground">•</span>
+                      <span className={`font-bold ${getScoreColor(page.overallScore || 0)}`}>
+                        {page.overallScore || 0}%
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {page.url.replace(/^https?:\/\/(www\.)?/, '').substring(0, 60)}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setSelectedPage(page)}
+                  data-testid={`quick-access-page-${index}`}
+                >
+                  <FileText className="h-4 w-4 mr-1" />
+                  View Analysis
+                </Button>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Individual Page Results */}
       <Card>
         <CardHeader>
@@ -190,7 +243,17 @@ export function MultiPageResults({ data }: MultiPageResultsProps) {
             {data.pageResults.map((page: any, index: number) => (
               <TabsContent key={index} value={index.toString()} className="space-y-4">
                 <div>
-                  <p className="text-sm text-muted-foreground mb-2">{page.url}</p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm text-muted-foreground">{page.url}</p>
+                    <Button
+                      size="sm"
+                      onClick={() => setSelectedPage(page)}
+                      data-testid={`view-page-details-${index}`}
+                    >
+                      <FileText className="h-4 w-4 mr-1" />
+                      View Detailed Analysis
+                    </Button>
+                  </div>
                   
                   {/* Page Scores */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
