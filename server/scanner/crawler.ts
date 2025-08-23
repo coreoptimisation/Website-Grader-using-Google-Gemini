@@ -62,6 +62,8 @@ export class WebCrawler {
       
       // Discover all links on the page
       const links = await this.discoverLinks(page, startUrl);
+      console.log(`Discovered ${links.length} links from ${startUrl}`);
+      console.log('Sample links:', links.slice(0, 10));
       
       // Analyze and categorize pages
       result.discoveredPages = this.categorizePages(links);
@@ -266,8 +268,14 @@ export class WebCrawler {
       return { url, type: "other" as const, priority: 1 };
     });
     
+    console.log(`Categorized ${pages.length} pages:`);
+    pages.forEach(p => console.log(`  ${p.type.toUpperCase()} (priority ${p.priority}): ${p.url}`));
+    
     // Filter and prioritize to get exactly 4 critical pages (homepage, shop, booking, detail)
     const prioritized = this.selectCriticalPages(pages);
+    console.log(`Selected ${prioritized.length} critical pages:`);
+    prioritized.forEach(p => console.log(`  ${p.type.toUpperCase()}: ${p.url}`));
+    
     return prioritized;
   }
   
