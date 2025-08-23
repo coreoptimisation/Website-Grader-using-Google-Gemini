@@ -12,7 +12,9 @@ export default function AgentReadinessDetails({ rawData }: AgentReadinessDetails
     seo = {},
     structuredData = {},
     crawlability = {},
-    aiReadiness = {}
+    aiReadiness = {},
+    isAggregated = false,
+    totalPagesAnalyzed = 1
   } = rawData;
   
   const renderMetric = (label: string, value: any, status: 'good' | 'warning' | 'bad') => {
@@ -48,7 +50,14 @@ export default function AgentReadinessDetails({ rawData }: AgentReadinessDetails
   
   return (
     <Card className="p-6" data-testid="agent-readiness-details">
-      <h3 className="text-lg font-semibold text-slate-900 mb-4">Agent Readiness Analysis</h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-slate-900">Agent Readiness Analysis</h3>
+        {isAggregated && (
+          <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
+            Aggregated from {totalPagesAnalyzed} pages
+          </span>
+        )}
+      </div>
       
       <div className="space-y-4">
         {/* SEO Section */}

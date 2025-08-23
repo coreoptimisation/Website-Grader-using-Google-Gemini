@@ -21,7 +21,7 @@ export default function AccessibilityDetails({ rawData }: AccessibilityDetailsPr
   
   if (!rawData) return null;
   
-  const { violations = [], passes = [], incomplete = [] } = rawData;
+  const { violations = [], passes = [], incomplete = [], isAggregated = false, totalPagesAnalyzed = 1 } = rawData;
   
   const toggleSection = (section: string) => {
     setExpandedSections(prev => 
@@ -112,7 +112,14 @@ export default function AccessibilityDetails({ rawData }: AccessibilityDetailsPr
   
   return (
     <Card className="p-6" data-testid="accessibility-details">
-      <h3 className="text-lg font-semibold text-slate-900 mb-4">Detailed Accessibility Checks</h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-slate-900">Detailed Accessibility Checks</h3>
+        {isAggregated && (
+          <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
+            Aggregated from {totalPagesAnalyzed} pages
+          </span>
+        )}
+      </div>
       
       <div className="space-y-4">
         {sections.map(section => (

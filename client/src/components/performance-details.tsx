@@ -8,6 +8,8 @@ interface PerformanceDetailsProps {
 export default function PerformanceDetails({ rawData }: PerformanceDetailsProps) {
   if (!rawData) return null;
   
+  const { isAggregated = false, totalPagesAnalyzed = 1 } = rawData;
+  
   // Extract metrics from the performance scanner data structure
   const lighthouseMetrics = {
     largestContentfulPaint: rawData.coreWebVitals?.lcp,
@@ -69,7 +71,14 @@ export default function PerformanceDetails({ rawData }: PerformanceDetailsProps)
   
   return (
     <Card className="p-6" data-testid="performance-details">
-      <h3 className="text-lg font-semibold text-slate-900 mb-4">Performance Analysis</h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-slate-900">Performance Analysis</h3>
+        {isAggregated && (
+          <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
+            Average of {totalPagesAnalyzed} pages
+          </span>
+        )}
+      </div>
       
       <div className="space-y-4">
         {/* Core Web Vitals */}

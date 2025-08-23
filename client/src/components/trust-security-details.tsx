@@ -8,7 +8,7 @@ interface TrustSecurityDetailsProps {
 export default function TrustSecurityDetails({ rawData }: TrustSecurityDetailsProps) {
   if (!rawData) return null;
   
-  const { headers = {}, ssl = {}, privacy = {}, security = {} } = rawData;
+  const { headers = {}, ssl = {}, privacy = {}, security = {}, isAggregated = false, totalPagesAnalyzed = 1 } = rawData;
   
   const renderHeader = (name: string, present: boolean, value?: string, recommendation?: string) => {
     return (
@@ -60,7 +60,14 @@ export default function TrustSecurityDetails({ rawData }: TrustSecurityDetailsPr
   
   return (
     <Card className="p-6" data-testid="trust-security-details">
-      <h3 className="text-lg font-semibold text-slate-900 mb-4">Trust & Security Analysis</h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-slate-900">Trust & Security Analysis</h3>
+        {isAggregated && (
+          <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
+            Analyzed across {totalPagesAnalyzed} pages
+          </span>
+        )}
+      </div>
       
       <div className="space-y-4">
         {/* Security Headers */}

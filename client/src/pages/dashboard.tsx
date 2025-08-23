@@ -14,6 +14,7 @@ import TrustSecurityDetails from "@/components/trust-security-details";
 import ScreenshotViewer from "@/components/screenshot-viewer";
 import VisualInsights from "@/components/visual-insights";
 import { MultiPageResults } from "@/components/multi-page-results";
+import { aggregateMultiPageData } from "@/lib/aggregate-multi-page-data";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -296,23 +297,44 @@ export default function Dashboard() {
                   })()}
                   
                   {/* Always show the detailed analysis components */}
-                  <PillarScores results={(activeScanData as any).results} />
-                  <OverallScore report={(activeScanData as any).report} results={(activeScanData as any).results} />
-                  {activeScanId && <ScreenshotViewer scanId={activeScanId} evidence={scanEvidence as any} />}
-                  <VisualInsights insights={(activeScanData as any)?.report?.geminiAnalysis?.visualInsights} />
-                  <AccessibilityDetails 
-                    rawData={(activeScanData as any).results?.find((r: any) => r.pillar === 'accessibility')?.rawData}
-                  />
-                  <TrustSecurityDetails
-                    rawData={(activeScanData as any).results?.find((r: any) => r.pillar === 'trust')?.rawData}
-                  />
-                  <PerformanceDetails
-                    rawData={(activeScanData as any).results?.find((r: any) => r.pillar === 'performance')?.rawData}
-                  />
-                  <AgentReadinessDetails
-                    rawData={(activeScanData as any).results?.find((r: any) => r.pillar === 'agentReadiness')?.rawData}
-                  />
-                  <Recommendations report={(activeScanData as any).report} />
+                  {(() => {
+                    // Check if we need to aggregate multi-page data
+                    const accessibilityRawData = (activeScanData as any).results?.find((r: any) => r.pillar === 'accessibility')?.rawData;
+                    const performanceRawData = (activeScanData as any).results?.find((r: any) => r.pillar === 'performance')?.rawData;
+                    const trustRawData = (activeScanData as any).results?.find((r: any) => r.pillar === 'trust')?.rawData;
+                    const agentRawData = (activeScanData as any).results?.find((r: any) => r.pillar === 'agentReadiness')?.rawData;
+                    
+                    // If it's multi-page data, aggregate it
+                    const isMultiPageData = accessibilityRawData?.multiPage === true;
+                    let aggregatedData: any = {};
+                    
+                    if (isMultiPageData) {
+                      // Aggregate all the multi-page data
+                      aggregatedData = aggregateMultiPageData(accessibilityRawData);
+                    }
+                    
+                    return (
+                      <>
+                        <PillarScores results={(activeScanData as any).results} />
+                        <OverallScore report={(activeScanData as any).report} results={(activeScanData as any).results} />
+                        {activeScanId && <ScreenshotViewer scanId={activeScanId} evidence={scanEvidence as any} />}
+                        <VisualInsights insights={(activeScanData as any)?.report?.geminiAnalysis?.visualInsights} />
+                        <AccessibilityDetails 
+                          rawData={isMultiPageData ? aggregatedData.accessibility : accessibilityRawData}
+                        />
+                        <TrustSecurityDetails
+                          rawData={isMultiPageData ? aggregatedData.security : trustRawData}
+                        />
+                        <PerformanceDetails
+                          rawData={isMultiPageData ? aggregatedData.performance : performanceRawData}
+                        />
+                        <AgentReadinessDetails
+                          rawData={isMultiPageData ? aggregatedData.agentReadiness : agentRawData}
+                        />
+                        <Recommendations report={(activeScanData as any).report} />
+                      </>
+                    );
+                  })()}
                 </>
               )}
 
