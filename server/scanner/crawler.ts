@@ -23,7 +23,7 @@ export interface CrawlResult {
 export class WebCrawler {
   private browser: Browser | null = null;
   private visited = new Set<string>();
-  private maxPages = 10; // Limit to prevent excessive crawling
+  private maxPages = 4; // Focus on the 4 critical pages only
   private domain: string = "";
   
   async crawl(startUrl: string): Promise<CrawlResult> {
@@ -71,10 +71,7 @@ export class WebCrawler {
       
       // If no sitemap, use discovered links
       if (result.urls.length === 0) {
-        result.urls = result.discoveredPages
-          .sort((a, b) => b.priority - a.priority)
-          .slice(0, this.maxPages)
-          .map(p => p.url);
+        result.urls = result.discoveredPages.map(p => p.url);
       }
       
       // Always include the homepage
@@ -191,34 +188,55 @@ export class WebCrawler {
   }
   
   private categorizePages(urls: string[]): CrawlResult['discoveredPages'] {
-    return urls.map(url => {
+    const pages = urls.map(url => {
       const lower = url.toLowerCase();
+      const path = lower.split('/').filter(Boolean);
       
-      // Detect page type based on URL patterns
-      if (lower.includes('/cart') || lower.includes('/basket') || lower.includes('/bag')) {
-        return { url, type: "cart" as const, priority: 9 };
+      // 1. Homepage - highest priority
+      if (url.endsWith('/') || url === this.domain || path.length <= 1) {
+        return { url, type: "homepage" as const, priority: 10 };
       }
-      if (lower.includes('/checkout') || lower.includes('/payment') || lower.includes('/pay')) {
-        return { url, type: "checkout" as const, priority: 10 };
+      
+      // 2. Booking/Checkout Page - critical transaction pages
+      if (lower.includes('/checkout') || lower.includes('/payment') || lower.includes('/pay') ||
+          lower.includes('/book') || lower.includes('/reservation') || lower.includes('/appointment') ||
+          lower.includes('/cart') || lower.includes('/basket') || lower.includes('/bag')) {
+        return { url, type: "checkout" as const, priority: 9 };
       }
-      if (lower.includes('/book') || lower.includes('/reservation') || lower.includes('/appointment')) {
-        return { url, type: "booking" as const, priority: 9 };
+      
+      // 3. Main Offerings Page - "shop window" pages (rooms, tours, tickets, services)
+      if (lower.includes('/rooms') || lower.includes('/tours') || lower.includes('/tickets') ||
+          lower.includes('/services') || lower.includes('/packages') || lower.includes('/experiences') ||
+          lower.includes('/accommodations') || lower.includes('/activities') || lower.includes('/events') ||
+          lower.includes('/shop') || lower.includes('/store') || lower.includes('/catalog') ||
+          lower.includes('/offerings') || lower.includes('/suites') || lower.includes('/properties')) {
+        return { url, type: "product" as const, priority: 8 };
       }
-      if (lower.includes('/product') || lower.includes('/item') || lower.includes('/shop') || lower.includes('/store')) {
+      
+      // 4. Specific Detail Page - individual product/service pages
+      // Look for URLs that seem to be specific items (longer paths, IDs, specific names)
+      if ((path.length >= 3 && !lower.includes('/category') && !lower.includes('/search')) ||
+          lower.includes('/room/') || lower.includes('/tour/') || lower.includes('/ticket/') ||
+          lower.includes('/suite/') || lower.includes('/package/') || lower.includes('/experience/') ||
+          /\/[a-z]+-[a-z]+-/.test(lower) || // hyphenated names like "deluxe-queen-room"
+          /\/\d+/.test(lower)) { // URLs with numbers like product IDs
         return { url, type: "product" as const, priority: 7 };
       }
+      
+      // Lower priority pages
       if (lower.includes('/contact') || lower.includes('/support')) {
-        return { url, type: "contact" as const, priority: 6 };
+        return { url, type: "contact" as const, priority: 3 };
       }
       if (lower.includes('/about')) {
-        return { url, type: "about" as const, priority: 5 };
-      }
-      if (url.endsWith('/') || url === this.domain) {
-        return { url, type: "homepage" as const, priority: 8 };
+        return { url, type: "about" as const, priority: 3 };
       }
       
-      return { url, type: "other" as const, priority: 3 };
+      return { url, type: "other" as const, priority: 1 };
     });
+    
+    // Filter and prioritize to get exactly the 4 critical page types
+    const prioritized = this.selectCriticalPages(pages);
+    return prioritized;
   }
   
   private identifyEcommercePages(pages: CrawlResult['discoveredPages']): CrawlResult['ecommercePages'] {
@@ -256,25 +274,42 @@ export class WebCrawler {
     return ecommerce;
   }
   
-  private prioritizeUrls(urls: string[]): string[] {
-    // Prioritize important pages
-    const prioritized = urls.map(url => {
-      const lower = url.toLowerCase();
-      let priority = 5;
-      
-      if (url.endsWith('/') || !url.includes('/', 8)) priority = 10; // Homepage
-      else if (lower.includes('checkout') || lower.includes('cart')) priority = 9;
-      else if (lower.includes('book') || lower.includes('reservation')) priority = 9;
-      else if (lower.includes('product') || lower.includes('shop')) priority = 8;
-      else if (lower.includes('contact') || lower.includes('about')) priority = 7;
-      else if (lower.includes('blog') || lower.includes('news')) priority = 4;
-      else if (lower.includes('privacy') || lower.includes('terms')) priority = 2;
-      
-      return { url, priority };
-    });
+  private selectCriticalPages(pages: CrawlResult['discoveredPages']): CrawlResult['discoveredPages'] {
+    const result: CrawlResult['discoveredPages'] = [];
     
-    return prioritized
-      .sort((a, b) => b.priority - a.priority)
-      .map(item => item.url);
+    // 1. Always include homepage (highest priority)
+    const homepage = pages.find(p => p.type === "homepage");
+    if (homepage) result.push(homepage);
+    
+    // 2. Find best booking/checkout page
+    const checkoutPages = pages.filter(p => p.type === "checkout").sort((a, b) => b.priority - a.priority);
+    if (checkoutPages.length > 0) result.push(checkoutPages[0]);
+    
+    // 3. Find main offerings page (highest priority product page)
+    const productPages = pages.filter(p => p.type === "product").sort((a, b) => b.priority - a.priority);
+    if (productPages.length > 0) {
+      // Add the main offerings page (higher priority = more general)
+      result.push(productPages[0]);
+      
+      // 4. Add a specific detail page if available (lower priority = more specific)
+      const detailPage = productPages.reverse().find(p => p.priority === 7);
+      if (detailPage && result.length < 4) {
+        result.push(detailPage);
+      }
+    }
+    
+    // Fill remaining slots if we don't have 4 pages yet
+    while (result.length < 4 && pages.length > result.length) {
+      const remaining = pages
+        .filter(p => !result.some(r => r.url === p.url))
+        .sort((a, b) => b.priority - a.priority);
+      if (remaining.length > 0) {
+        result.push(remaining[0]);
+      } else {
+        break;
+      }
+    }
+    
+    return result.slice(0, 4); // Ensure exactly 4 pages max
   }
 }

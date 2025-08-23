@@ -72,12 +72,15 @@ export async function runMultiPageScan(
   const crawler = new WebCrawler();
   const crawlResult = await crawler.crawl(startUrl);
   
-  console.log(`Discovered ${crawlResult.urls.length} pages to analyze`);
+  console.log(`Discovered ${crawlResult.urls.length} critical pages to analyze:`);
+  crawlResult.discoveredPages.forEach((page, index) => {
+    console.log(`  ${index + 1}. ${page.type.toUpperCase()}: ${page.url}`);
+  });
   console.log(`Found ecommerce pages:`, crawlResult.ecommercePages);
   
-  // Step 2: Scan each page (limit to prevent overload)
+  // Step 2: Scan each critical page (exactly 4 pages max)
   const pageResults: PageScanResult[] = [];
-  const maxPagesToScan = Math.min(crawlResult.urls.length, 7); // Scan up to 7 pages
+  const maxPagesToScan = Math.min(crawlResult.urls.length, 4); // Scan exactly 4 critical pages
   
   for (let i = 0; i < maxPagesToScan; i++) {
     const url = crawlResult.urls[i];
