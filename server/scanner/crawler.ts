@@ -181,15 +181,19 @@ export class WebCrawler {
           // Always allow same domain
           if (linkUrl.origin === url.origin) return true;
           
-          // Allow external domains that match commerce patterns
+          // Allow external domains ONLY for booking/commerce platforms (not social media)
           const hostname = linkUrl.hostname.toLowerCase();
+          
+          // Exclude social media and irrelevant domains
+          const excludePatterns = ['facebook.com', 'twitter.com', 'instagram.com', 'youtube.com', 'linkedin.com', 'tiktok.com'];
+          if (excludePatterns.some(pattern => hostname.includes(pattern))) {
+            return false;
+          }
+          
+          // Only allow external domains that are clearly booking/ecommerce platforms
           const commercePatterns = [
-            // Booking/reservation patterns
             'book', 'reservation', 'reserve', 'ticket', 'appointment', 'booking',
-            // Ecommerce patterns  
-            'shop', 'store', 'cart', 'checkout', 'buy', 'order',
-            // Common platform indicators
-            'secure', 'payment', 'gateway'
+            'shop', 'store', 'cart', 'checkout', 'buy', 'order', 'secure', 'payment'
           ];
           
           return commercePatterns.some(pattern => hostname.includes(pattern));
@@ -208,8 +212,12 @@ export class WebCrawler {
       const lower = url.toLowerCase();
       const path = lower.split('/').filter(Boolean);
       
-      // 1. Homepage - highest priority (but not other pages ending in /)
-      if ((url.endsWith('/') && path.length <= 1) || url === this.domain) {
+      // 1. Homepage - highest priority
+      const cleanDomain = this.domain.replace('https://', '').replace('http://', '').replace('www.', '');
+      const cleanUrl = url.replace('https://', '').replace('http://', '').replace('www.', '');
+      
+      if (cleanUrl === cleanDomain || cleanUrl === cleanDomain + '/' || 
+          (url.endsWith('/') && path.length <= 1 && url.includes(cleanDomain))) {
         return { url, type: "homepage" as const, priority: 10 };
       }
       
@@ -317,28 +325,54 @@ export class WebCrawler {
   private selectCriticalPages(pages: CrawlResult['discoveredPages']): CrawlResult['discoveredPages'] {
     const result: CrawlResult['discoveredPages'] = [];
     
-    // 1. Always include homepage (highest priority)
+    // 1. Homepage - always essential (non-negotiable)
     const homepage = pages.find(p => p.type === "homepage");
     if (homepage) result.push(homepage);
     
-    // 2. Find shop page (priority 9) - /shop, /store
+    // 2. Main Offerings/Shop Page - essential for product discovery
     const shopPages = pages.filter(p => p.type === "product" && p.priority === 9);
     if (shopPages.length > 0) result.push(shopPages[0]);
     
-    // 3. Find booking page (priority 9) - external domains or booking paths
-    const bookingPages = pages.filter(p => p.type === "booking").sort((a, b) => b.priority - a.priority);
-    if (bookingPages.length > 0) result.push(bookingPages[0]);
+    // 3. Booking/Checkout Page - essential for conversion (exclude social media)
+    const validBookingPages = pages.filter(p => {
+      if (p.type !== "booking") return false;
+      // Exclude social media domains
+      const url = p.url.toLowerCase();
+      return !url.includes('facebook.com') && !url.includes('twitter.com') && 
+             !url.includes('instagram.com') && !url.includes('youtube.com');
+    }).sort((a, b) => b.priority - a.priority);
+    if (validBookingPages.length > 0) result.push(validBookingPages[0]);
     
-    // 4. Find best remaining page (detail page, checkout, or other offerings)
-    const remainingPages = pages
-      .filter(p => !result.some(r => r.url === p.url))
-      .sort((a, b) => b.priority - a.priority);
+    // 4. High-Value Content/Trust-Building Page - supports purchase decision
+    const trustBuildingPages = pages.filter(p => {
+      if (result.some(r => r.url === p.url)) return false;
+      const url = p.url.toLowerCase();
+      return url.includes('/about') || url.includes('/contact') || url.includes('/location') ||
+             url.includes('/faq') || url.includes('/policy') || url.includes('/getting-here') ||
+             url.includes('/parking') || url.includes('/directions');
+    }).sort((a, b) => b.priority - a.priority);
     
-    if (remainingPages.length > 0 && result.length < 4) {
-      result.push(remainingPages[0]);
+    if (trustBuildingPages.length > 0 && result.length < 4) {
+      result.push(trustBuildingPages[0]);
     }
     
-    return result.slice(0, 4); // Limit to exactly 4 pages
+    // 5. Fill remaining slots with highest priority remaining pages (exclude social media)
+    while (result.length < 4) {
+      const remainingPages = pages.filter(p => {
+        if (result.some(r => r.url === p.url)) return false;
+        const url = p.url.toLowerCase();
+        return !url.includes('facebook.com') && !url.includes('twitter.com') && 
+               !url.includes('instagram.com') && !url.includes('youtube.com');
+      }).sort((a, b) => b.priority - a.priority);
+      
+      if (remainingPages.length > 0) {
+        result.push(remainingPages[0]);
+      } else {
+        break;
+      }
+    }
+    
+    return result.slice(0, 4); // Exactly 4 pages
   }
   
   private isExternalBookingDomain(url: string): boolean {
