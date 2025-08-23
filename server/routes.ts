@@ -133,8 +133,10 @@ async function processScan(scanId: string, url: string) {
         data: evidence.screenshot
       });
       
-      // Also store viewport screenshot if it exists
-      const viewportPath = evidence.screenshot.filePath.replace('.png', '').replace('/screenshots/', '/screenshots/') + '_viewport.png';
+      // Also store viewport screenshot if it exists  
+      // The viewport screenshot has the format: scanId_viewport_timestamp.png
+      const baseFilename = evidence.screenshot.filePath.split('/').pop()?.replace('.png', '');
+      const viewportPath = `/screenshots/${baseFilename?.replace(scanId + '_', scanId + '_viewport_')}.png`;
       await storage.createScanEvidence({
         scanId,
         type: "screenshot_viewport",
