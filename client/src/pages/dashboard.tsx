@@ -85,20 +85,13 @@ export default function Dashboard() {
     }
   };
 
-  // When scan completes, invalidate queries to update the UI and show toast
+  // When scan completes, invalidate queries to update the UI
   useEffect(() => {
     if (isCompleted && activeScanId) {
       queryClient.invalidateQueries({ queryKey: ['/api/scans'] });
       queryClient.invalidateQueries({ queryKey: ['/api/scans', activeScanId] });
-      queryClient.invalidateQueries({ queryKey: ['/api/scans', activeScanId, 'evidence'] });
-      
-      // Show completion toast
-      toast({
-        title: "Scan Complete!",
-        description: "Your multi-page website analysis has finished. Review the comprehensive results below.",
-      });
     }
-  }, [isCompleted, activeScanId, toast]);
+  }, [isCompleted, activeScanId]);
 
   return (
     <div className="min-h-screen flex relative">
@@ -312,8 +305,8 @@ export default function Dashboard() {
               {/* URL Input Section */}
               <ScanForm onScanStarted={handleScanStarted} />
 
-              {/* Current Scan Progress - Only show when actively scanning */}
-              {activeScanId && isScanning && (
+              {/* Current Scan Progress */}
+              {activeScanId && (isScanning || scanLoading) && (
                 <ScanProgress 
                   scanId={activeScanId} 
                   url={(activeScanData as any)?.scan?.url} 
