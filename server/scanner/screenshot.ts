@@ -1,4 +1,4 @@
-import { launchPlaywrightBrowser } from "./browser-launcher";
+import { browserPool } from "./browser-pool";
 import { mkdir, writeFile } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
@@ -15,13 +15,12 @@ export interface ScreenshotResult {
 }
 
 export async function captureScreenshot(url: string, scanId: string): Promise<ScreenshotResult> {
-  const browser = await launchPlaywrightBrowser();
+  let page;
   
   try {
-    const context = await browser.newContext({
-      viewport: { width: 1920, height: 1080 }
-    });
-    const page = await context.newPage();
+    // Use shared browser pool to prevent resource exhaustion
+    page = await browserPool.getPage();
+    await page.setViewportSize({ width: 1920, height: 1080 });
     
     // Navigate to the page
     await page.goto(url, { 
@@ -83,7 +82,9 @@ export async function captureScreenshot(url: string, scanId: string): Promise<Sc
       }
     };
   } finally {
-    await browser.close();
+    if (page) {
+      await page.close();
+    }
   }
 }
 
@@ -150,6 +151,8 @@ export async function captureElementScreenshot(
       }
     };
   } finally {
-    await browser.close();
+    if (page) {
+      await page.close();
+    }
   }
 }

@@ -7,7 +7,7 @@ import { analyzeScreenshot } from "./gemini-visual";
 import { z } from "zod";
 import { calculateOverallScore, getGrade, getGradeExplanation } from "../shared/scoring";
 import { generateAgentActionBlueprint } from "./scanner/agent-blueprint";
-import { checkBrowserHealth } from "./scanner/browser-launcher";
+import { browserPool } from "./scanner/browser-pool";
 
 const scanRequestSchema = z.object({
   url: z.string().url("Invalid URL format"),
@@ -25,7 +25,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Health check with browser availability
   app.get("/api/health", async (req, res) => {
     try {
-      const browserHealthy = await checkBrowserHealth();
+      const browserHealthy = await browserPool.checkHealth();
       res.json({ 
         status: browserHealthy ? "ok" : "degraded",
         browser: browserHealthy ? "available" : "unavailable",

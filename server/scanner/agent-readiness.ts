@@ -1,4 +1,4 @@
-import { launchPlaywrightBrowser } from "./browser-launcher";
+import { browserPool } from "./browser-pool";
 import * as xml2js from "xml2js";
 
 export interface AgentReadinessResult {
@@ -41,11 +41,12 @@ export interface AgentReadinessResult {
 }
 
 export async function runAgentReadinessAudit(url: string): Promise<AgentReadinessResult> {
-  const browser = await launchPlaywrightBrowser();
   const baseUrl = new URL(url).origin;
+  let page;
   
   try {
-    const page = await browser.newPage();
+    // Use shared browser pool to prevent resource exhaustion
+    page = await browserPool.getPage();
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
     
     // Check robots.txt
@@ -89,7 +90,9 @@ export async function runAgentReadinessAudit(url: string): Promise<AgentReadines
     };
     
   } finally {
-    await browser.close();
+    if (page) {
+      await page.close();
+    }
   }
 }
 

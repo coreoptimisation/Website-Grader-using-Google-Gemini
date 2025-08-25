@@ -1,5 +1,5 @@
 import { Browser, Page } from "playwright";
-import { launchPlaywrightBrowser } from "./browser-launcher";
+import { browserPool } from "./browser-pool";
 import robotsParser from "robots-parser";
 import * as xml2js from "xml2js";
 
@@ -32,8 +32,8 @@ export class WebCrawler {
       const url = new URL(startUrl);
       this.domain = url.origin;
       
-      // Launch browser
-      this.browser = await launchPlaywrightBrowser();
+      // Use shared browser pool instead of launching new browser
+      this.browser = await browserPool.getPlaywrightBrowser();
       
       const result: CrawlResult = {
         urls: [],
@@ -90,9 +90,8 @@ export class WebCrawler {
         discoveredPages: [{ url: startUrl, type: "homepage", priority: 10 }]
       };
     } finally {
-      if (this.browser) {
-        await this.browser.close();
-      }
+      // Don't close the shared browser, it will be reused
+      // The browser pool manages browser lifecycle
     }
   }
   

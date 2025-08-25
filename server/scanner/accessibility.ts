@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { launchPlaywrightBrowser } from "./browser-launcher";
+import { browserPool } from "./browser-pool";
 
 export interface AccessibilityResult {
   score: number;
@@ -14,11 +14,11 @@ export interface AccessibilityResult {
 }
 
 export async function runAccessibilityAudit(url: string): Promise<AccessibilityResult> {
-  const browser = await launchPlaywrightBrowser();
+  let page;
   
   try {
-    const context = await browser.newContext();
-    const page = await context.newPage();
+    // Use shared browser pool to prevent resource exhaustion
+    page = await browserPool.getPage();
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
     
     // Run axe-core accessibility audit
@@ -88,6 +88,8 @@ export async function runAccessibilityAudit(url: string): Promise<AccessibilityR
     };
     
   } finally {
-    await browser.close();
+    if (page) {
+      await page.close();
+    }
   }
 }

@@ -1,6 +1,6 @@
 import lighthouse from "lighthouse";
 import { fetchCrUXData, CrUXResult } from "./crux";
-import { launchPuppeteerBrowser } from "./browser-launcher";
+import { browserPool } from "./browser-pool";
 
 export interface PerformanceResult {
   score: number;
@@ -24,7 +24,8 @@ export interface PerformanceResult {
 }
 
 export async function runPerformanceAudit(url: string): Promise<PerformanceResult> {
-  const browser = await launchPuppeteerBrowser();
+  // Use shared browser pool to prevent resource exhaustion
+  const browser = await browserPool.getPuppeteerBrowser();
   
   try {
     const result = await lighthouse(url, {
@@ -49,7 +50,7 @@ export async function runPerformanceAudit(url: string): Promise<PerformanceResul
       }
     });
     
-    await browser.close();
+    // Don't close the shared browser, just let it be reused
     
     if (!result?.lhr) {
       throw new Error("Lighthouse failed to generate report");

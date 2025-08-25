@@ -10,12 +10,13 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Updates (August 25, 2025)
 
-### Browser Management Centralization
-- **Implemented Centralized Browser Launcher**: Created `server/scanner/browser-launcher.ts` module following consultant's Option 1 recommendation
-- **Removed Dev/Prod Branching**: Eliminated all conditional browser paths for identical runtime behavior across environments
-- **Playwright Auto-Detection**: Let Playwright manage browser discovery instead of hardcoded paths
-- **Health Check Integration**: Added browser availability check to `/api/health` endpoint for easier production diagnostics
-- **Improved Error Handling**: Scans now return meaningful error messages instead of zero scores when browser launch fails
+### Browser Resource Management Fix (August 25, 2025)
+- **Root Cause Identified**: Multi-page scans were launching 21 separate browser instances (1 crawler + 5 scanners × 4 pages), exhausting production server resources
+- **Implemented Browser Pool**: Created `server/scanner/browser-pool.ts` with shared browser instances and concurrency control
+- **Updated All Scanners**: Modified accessibility, performance, security, agent-readiness, screenshot, and crawler modules to use shared browser pool
+- **Resource Impact**: Reduced browser usage from 21 instances to 1 shared instance for multi-page scans
+- **Production Fix**: Resolved issue where multi-page scans got stuck in "scanning" status on production while single-page scans worked
+- **Added Scan Timeouts**: Implemented 6-minute timeout for multi-page scans and 2-minute timeout for single-page scans to prevent hanging
 
 ## System Architecture
 
