@@ -14,6 +14,11 @@ const scanRequestSchema = z.object({
   multiPage: z.boolean().optional().default(true) // Default to multi-page scanning
 });
 
+// Initialize global scan progress tracker
+if (!(global as any).scanProgress) {
+  (global as any).scanProgress = {};
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   
   // Health check
@@ -46,7 +51,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get scan status and results
+  // Get scan status and results with progress
   app.get("/api/scans/:id", async (req, res) => {
     try {
       const scan = await storage.getScan(req.params.id);
@@ -56,11 +61,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const results = await storage.getScanResults(scan.id);
       const report = await storage.getScanReport(scan.id);
+      
+      // Include progress if scan is in progress
+      let progress = null;
+      if (scan.status === 'scanning' && (global as any).scanProgress?.[scan.id]) {
+        progress = (global as any).scanProgress[scan.id];
+      }
 
       res.json({
         scan,
         results,
-        report
+        report,
+        progress
       });
     } catch (error) {
       console.error("Error fetching scan:", error);
