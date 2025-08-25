@@ -65,7 +65,7 @@ export interface MultiPageScanResult {
 }
 
 // Progress tracking helper
-function updateProgress(scanId: string, stage: string, currentPage: number, totalPages: number, message: string) {
+function updateProgress(scanId: string, stage: string, currentPage: number, totalPages: number, message: string, pageUrl?: string) {
   const percentage = Math.round((currentPage / (totalPages + 2)) * 100); // +2 for crawling and finalizing stages
   if ((global as any).scanProgress) {
     (global as any).scanProgress[scanId] = {
@@ -74,6 +74,7 @@ function updateProgress(scanId: string, stage: string, currentPage: number, tota
       totalPages,
       message,
       percentage,
+      pageUrl,
       timestamp: Date.now()
     };
   }
@@ -107,12 +108,11 @@ export async function runMultiPageScan(
     
     console.log(`Scanning page ${i + 1}/${maxPagesToScan}: ${url} (${pageType})`);
     
-    // Update progress for current page
-    const pageTypeLabel = pageType === 'homepage' ? 'Homepage' : 
-                         pageType === 'booking' ? 'Booking/Checkout Page' :
-                         pageType === 'product' ? 'Product/Shop Page' :
-                         pageType === 'cart' ? 'Shopping Cart' : 'Content Page';
-    updateProgress(scanId, 'scanning', i + 1, maxPagesToScan, `Analyzing ${pageTypeLabel}: Running accessibility, performance, security, and SEO checks...`);
+    // Update progress for current page with actual URL
+    const pageLabel = pageType === 'homepage' ? 'Homepage' : 
+                      url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0] + 
+                      (url.includes('/') ? '/' + url.split('/').slice(3).join('/').substring(0, 30) : '');
+    updateProgress(scanId, 'scanning', i + 1, maxPagesToScan, `Analyzing ${pageLabel}: Running accessibility, performance, security, and SEO checks...`, url);
     
     try {
       // Run all scans in parallel for this page
@@ -127,7 +127,7 @@ export async function runMultiPageScan(
       // Special analysis for ecommerce/booking pages
       let ecommerceAnalysis;
       if (["cart", "checkout", "booking", "product"].includes(pageType)) {
-        updateProgress(scanId, 'scanning', i + 1, maxPagesToScan, `Analyzing ${pageTypeLabel}: Checking booking systems and e-commerce functionality...`);
+        updateProgress(scanId, 'scanning', i + 1, maxPagesToScan, `Analyzing ${pageLabel}: Checking booking systems and e-commerce functionality...`, url);
         ecommerceAnalysis = await analyzeEcommercePage(url, pageType, security, startUrl);
       }
       
