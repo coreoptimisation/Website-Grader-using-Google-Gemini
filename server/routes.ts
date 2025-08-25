@@ -232,14 +232,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 }
 
 async function processScan(scanId: string, url: string, multiPage: boolean = true) {
-  // Set a timeout for the entire scan process (6 minutes for multi-page, 2 minutes for single)
-  const scanTimeout = multiPage ? 360000 : 120000; // 6 minutes or 2 minutes
-  const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error('Scan timeout exceeded')), scanTimeout);
+  // Set a timeout for the entire scan process (4 minutes for multi-page, 90 seconds for single)
+  const scanTimeout = multiPage ? 240000 : 90000; // 4 minutes or 90 seconds  
+  
+  // Create timeout with proper cleanup
+  let timeoutId: NodeJS.Timeout;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      console.error(`Scan ${scanId} timed out after ${scanTimeout/1000} seconds`);
+      reject(new Error(`Scan timeout exceeded (${scanTimeout/1000}s)`));
+    }, scanTimeout);
   });
   
   try {
-    console.log(`Processing scan ${scanId} for ${url}`);
+    console.log(`Processing scan ${scanId} for ${url} (${multiPage ? 'multi-page' : 'single-page'})`);
+    console.log(`Timeout set for ${scanTimeout/1000} seconds`);
+    
     // Update status to scanning
     await storage.updateScanStatus(scanId, "scanning");
     
@@ -249,6 +257,9 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
       runCompleteScan(url, scanId, multiPage),
       timeoutPromise
     ]) as Awaited<ReturnType<typeof runCompleteScan>>;
+    
+    // Clear timeout if scan completed successfully
+    clearTimeout(timeoutId!);
     console.log('Scan completed, processing results...');
     
     // Check if it's a multi-page scan result
@@ -623,7 +634,13 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
 
   } catch (error) {
     console.error(`Scan processing failed for ${scanId}:`, error);
+    // Clear timeout on error
+    if (timeoutId!) {
+      clearTimeout(timeoutId);
+    }
     await storage.updateScanStatus(scanId, "failed");
+    // Clear progress tracking  
+    scanProgress.delete(scanId);
     throw error;
   }
 }
