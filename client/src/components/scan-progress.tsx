@@ -18,8 +18,14 @@ export default function ScanProgress({ scanId, url, status }: ScanProgressProps)
   // Fetch real progress data from backend
   const { data: scanData } = useQuery({
     queryKey: ['/api/scans', scanId],
-    enabled: !!scanId && status === 'scanning',
-    refetchInterval: 1000, // Update every second
+    enabled: !!scanId && (status === 'scanning' || status === 'pending'),
+    refetchInterval: (data: any) => {
+      // Keep polling while scanning or pending
+      const scanStatus = data?.scan?.status;
+      return (scanStatus === 'scanning' || scanStatus === 'pending') ? 1000 : false;
+    },
+    refetchOnWindowFocus: true,
+    staleTime: 500
   });
   
   const progress = (scanData as any)?.progress;
@@ -75,7 +81,9 @@ export default function ScanProgress({ scanId, url, status }: ScanProgressProps)
   const estimatedTotal = percentage > 0 ? (elapsedTime / percentage) * 100 : 360;
   const estimatedRemaining = Math.max(0, Math.round(estimatedTotal - elapsedTime));
   
-  if (status !== 'scanning') return null;
+  // Show progress component while scanning, pending, or if we have scan data showing it's still in progress
+  const actualStatus = (scanData as any)?.scan?.status || status;
+  if (actualStatus !== 'scanning' && actualStatus !== 'pending') return null;
 
   return (
     <Card className="p-6 mb-6" data-testid="scan-progress">

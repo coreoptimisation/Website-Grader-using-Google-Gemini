@@ -45,8 +45,10 @@ export default function Dashboard() {
     staleTime: 1000
   });
   
-  const isScanning = (activeScanData as any)?.scan?.status === 'scanning';
-  const isCompleted = (activeScanData as any)?.scan?.status === 'completed';
+  const currentStatus = (activeScanData as any)?.scan?.status;
+  const isScanning = currentStatus === 'scanning';
+  const isPending = currentStatus === 'pending';
+  const isCompleted = currentStatus === 'completed';
   
   const { data: scanEvidence } = useQuery({
     queryKey: ['/api/scans', activeScanId, 'evidence'],
