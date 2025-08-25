@@ -213,6 +213,11 @@ export default function Dashboard() {
             </div>
             <div className="flex items-center space-x-2 sm:space-x-4">
               <button 
+                onClick={() => {
+                  setActiveScanId(null);
+                  setCurrentView('dashboard');
+                  setIsViewingIndividualPage(false);
+                }}
                 className="px-3 sm:px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
                 data-testid="button-new-scan"
               >
