@@ -138,14 +138,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 }
 
 async function processScan(scanId: string, url: string, multiPage: boolean = true) {
+  // Set a timeout for the entire scan process (6 minutes for multi-page, 2 minutes for single)
+  const scanTimeout = multiPage ? 360000 : 120000; // 6 minutes or 2 minutes
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('Scan timeout exceeded')), scanTimeout);
+  });
+  
   try {
     console.log(`Processing scan ${scanId} for ${url}`);
     // Update status to scanning
     await storage.updateScanStatus(scanId, "scanning");
     
-    // Run complete scan with screenshot capture
+    // Run complete scan with screenshot capture, with timeout
     console.log('Running complete scan...');
-    const scanResult = await runCompleteScan(url, scanId, multiPage);
+    const scanResult = await Promise.race([
+      runCompleteScan(url, scanId, multiPage),
+      timeoutPromise
+    ]) as Awaited<ReturnType<typeof runCompleteScan>>;
     console.log('Scan completed, processing results...');
     
     // Check if it's a multi-page scan result
