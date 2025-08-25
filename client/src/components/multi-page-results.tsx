@@ -58,14 +58,14 @@ export function MultiPageResults({ data, evidence, scanId, onPageViewChange }: M
     <div className="space-y-6">
       {/* Multi-Page Analysis Header */}
       <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
-        <CardHeader>
+        <CardHeader className="p-4 sm:p-6">
           <div className="flex items-center gap-2">
-            <Globe className="h-5 w-5 text-blue-600" />
-            <CardTitle className="text-blue-900">Multi-Page Analysis Results</CardTitle>
+            <Globe className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+            <CardTitle className="text-base sm:text-lg text-blue-900">Multi-Page Analysis Results</CardTitle>
           </div>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-blue-800">
+        <CardContent className="p-4 sm:p-6">
+          <p className="text-xs sm:text-sm text-blue-800">
             Analyzed {data.pagesAnalyzed} pages across your website, including homepage, product pages, and checkout/booking functionality.
             The scores below represent weighted averages across all analyzed pages.
           </p>
@@ -78,7 +78,7 @@ export function MultiPageResults({ data, evidence, scanId, onPageViewChange }: M
           <CardTitle>Multi-Page Analysis Overview</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             <div>
               <p className="text-sm text-muted-foreground">Pages Analyzed</p>
               <p className="text-2xl font-bold">{data.pagesAnalyzed}</p>
@@ -146,7 +146,7 @@ export function MultiPageResults({ data, evidence, scanId, onPageViewChange }: M
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Functionality Score</p>
                   <p className={`text-xl font-bold ${getScoreColor(data.ecommerceSummary.functionalityScore)}`}>
@@ -278,7 +278,7 @@ export function MultiPageResults({ data, evidence, scanId, onPageViewChange }: M
                   )}
                   
                   {/* Page Scores */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
                     <div className="p-3 border rounded-lg">
                       <p className="text-xs text-muted-foreground">Accessibility</p>
                       <p className={`text-lg font-bold ${getScoreColor(page.accessibility?.score || 0)}`}>

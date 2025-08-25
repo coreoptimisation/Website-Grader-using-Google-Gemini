@@ -67,22 +67,22 @@ export default function PillarScores({ results }: PillarScoresProps) {
   });
 
   return (
-    <div className="grid grid-cols-4 gap-6 mb-6" data-testid="pillar-scores">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-6" data-testid="pillar-scores">
       {pillars.map(({ key, config, score, result }) => {
         const Icon = config.icon;
         
         return (
-          <Card key={key} className="p-6" data-testid={`pillar-${key}`}>
+          <Card key={key} className="p-4 sm:p-6" data-testid={`pillar-${key}`}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-2">
-                <Icon className={`w-5 h-5 ${config.color}`} />
-                <h4 className="font-semibold text-slate-900">{config.label}</h4>
+                <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${config.color}`} />
+                <h4 className="text-sm sm:text-base font-semibold text-slate-900">{config.label}</h4>
               </div>
-              <span className="text-xs text-slate-500">{config.weight} weight</span>
+              <span className="text-xs text-slate-500 hidden sm:inline">{config.weight} weight</span>
             </div>
             
             <div className="text-center">
-              <div className={`text-3xl font-bold mb-2 ${getScoreColor(score)}`} data-testid={`score-${key}`}>
+              <div className={`text-2xl sm:text-3xl font-bold mb-2 ${getScoreColor(score)}`} data-testid={`score-${key}`}>
                 {score}
               </div>
               <div className="w-full bg-slate-200 rounded-full h-2 mb-2">
@@ -91,7 +91,7 @@ export default function PillarScores({ results }: PillarScoresProps) {
                   style={{ width: `${score}%` }}
                 ></div>
               </div>
-              <p className="text-sm text-slate-600">{getScoreDescription(score)}</p>
+              <p className="text-xs sm:text-sm text-slate-600">{getScoreDescription(score)}</p>
             </div>
             
             <div className="mt-4 pt-4 border-t border-slate-200">

@@ -11,6 +11,8 @@ interface BookingSystemDetails {
   platform?: string;
   thirdParties: string[];
   features: string[];
+  detectionMethod?: 'footer' | 'domain' | 'fingerprint' | 'network' | 'fallback';
+  confidence?: 'high' | 'medium' | 'low';
 }
 
 export interface PageScanResult {
@@ -72,12 +74,15 @@ export async function runMultiPageScan(
   const crawler = new WebCrawler();
   const crawlResult = await crawler.crawl(startUrl);
   
-  console.log(`Discovered ${crawlResult.urls.length} pages to analyze`);
+  console.log(`Discovered ${crawlResult.urls.length} critical pages to analyze:`);
+  crawlResult.discoveredPages.forEach((page, index) => {
+    console.log(`  ${index + 1}. ${page.type.toUpperCase()}: ${page.url}`);
+  });
   console.log(`Found ecommerce pages:`, crawlResult.ecommercePages);
   
-  // Step 2: Scan each page (limit to prevent overload)
+  // Step 2: Scan each critical page (exactly 4 pages)
   const pageResults: PageScanResult[] = [];
-  const maxPagesToScan = Math.min(crawlResult.urls.length, 7); // Scan up to 7 pages
+  const maxPagesToScan = Math.min(crawlResult.urls.length, 4); // Focus on 4 critical pages: homepage, shop, booking, detail
   
   for (let i = 0; i < maxPagesToScan; i++) {
     const url = crawlResult.urls[i];
@@ -99,7 +104,7 @@ export async function runMultiPageScan(
       // Special analysis for ecommerce/booking pages
       let ecommerceAnalysis;
       if (["cart", "checkout", "booking", "product"].includes(pageType)) {
-        ecommerceAnalysis = await analyzeEcommercePage(url, pageType, security);
+        ecommerceAnalysis = await analyzeEcommercePage(url, pageType, security, startUrl);
       }
       
       // Calculate overall score for this page
@@ -155,11 +160,21 @@ export async function runMultiPageScan(
   };
 }
 
-async function detectBookingSystem(url: string): Promise<BookingSystemDetails> {
+async function detectBookingSystem(url: string, homepageUrl?: string): Promise<BookingSystemDetails> {
   const details: BookingSystemDetails = {
     thirdParties: [],
-    features: []
+    features: [],
+    confidence: 'low'
   };
+  
+  console.log(`Starting waterfall booking system detection for: ${url}`);
+  
+  // Method 1: URL/Domain Analysis (High Confidence, Low Cost)
+  console.log('Method 1: URL/Domain Analysis');
+  const domainResult = await analyzeBookingDomain(url, homepageUrl);
+  if (domainResult.provider) {
+    return { ...details, ...domainResult, detectionMethod: 'domain', confidence: 'high' };
+  }
   
   let browser;
   let page;
@@ -173,99 +188,43 @@ async function detectBookingSystem(url: string): Promise<BookingSystemDetails> {
     page = await browser.newPage();
     await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
     
-    // Get page content and scripts
     const content = await page.content();
-    const scripts = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll('script')).map(s => s.src || s.innerHTML);
-    });
     
-    const allContent = content + scripts.join(' ');
-    
-    // Detect booking system providers
-    const bookingProviders = [
-      { pattern: /bookassist/i, name: 'BookAssist' },
-      { pattern: /booking\.com/i, name: 'Booking.com' },
-      { pattern: /expedia/i, name: 'Expedia' },
-      { pattern: /cloudbeds/i, name: 'Cloudbeds' },
-      { pattern: /opera/i, name: 'Opera PMS' },
-      { pattern: /amadeus/i, name: 'Amadeus' },
-      { pattern: /sabre/i, name: 'Sabre' },
-      { pattern: /hotelogix/i, name: 'Hotelogix' },
-      { pattern: /littlehotelier/i, name: 'Little Hotelier' },
-      { pattern: /rezdy/i, name: 'Rezdy' },
-      { pattern: /checkfront/i, name: 'Checkfront' },
-      { pattern: /fareharbor/i, name: 'FareHarbor' },
-      { pattern: /opentable/i, name: 'OpenTable' },
-      { pattern: /resy/i, name: 'Resy' },
-      { pattern: /yelp.*reservations/i, name: 'Yelp Reservations' },
-      { pattern: /bookingengine/i, name: 'Generic Booking Engine' },
-      { pattern: /rezgo/i, name: 'Rezgo' },
-      { pattern: /trekksoft/i, name: 'TrekkSoft' },
-      { pattern: /guestline/i, name: 'Guestline' },
-      { pattern: /siteminder/i, name: 'SiteMinder' }
-    ];
-    
-    for (const provider of bookingProviders) {
-      if (provider.pattern.test(allContent)) {
-        details.provider = provider.name;
-        break;
-      }
+    // Method 2: Footer/Branding Analysis (High Confidence, Low Cost)
+    console.log('Method 2: Footer/Branding Analysis');
+    const footerResult = await analyzeFooterBranding(page, content);
+    if (footerResult.provider) {
+      return { ...details, ...footerResult, detectionMethod: 'footer', confidence: 'high' };
     }
     
-    // Detect third-party integrations
-    const thirdPartyServices = [
-      { pattern: /google.*analytics/i, name: 'Google Analytics' },
-      { pattern: /google.*tag.*manager/i, name: 'Google Tag Manager' },
-      { pattern: /facebook.*pixel/i, name: 'Facebook Pixel' },
-      { pattern: /stripe/i, name: 'Stripe Payments' },
-      { pattern: /paypal/i, name: 'PayPal' },
-      { pattern: /square/i, name: 'Square Payments' },
-      { pattern: /adyen/i, name: 'Adyen' },
-      { pattern: /braintree/i, name: 'Braintree' },
-      { pattern: /mailchimp/i, name: 'Mailchimp' },
-      { pattern: /hubspot/i, name: 'HubSpot' },
-      { pattern: /tripadvisor/i, name: 'TripAdvisor' },
-      { pattern: /trustpilot/i, name: 'Trustpilot' },
-      { pattern: /hotjar/i, name: 'Hotjar' },
-      { pattern: /intercom/i, name: 'Intercom' },
-      { pattern: /zendesk/i, name: 'Zendesk' },
-      { pattern: /calendly/i, name: 'Calendly' },
-      { pattern: /twilio/i, name: 'Twilio' }
-    ];
-    
-    for (const service of thirdPartyServices) {
-      if (service.pattern.test(allContent)) {
-        details.thirdParties.push(service.name);
-      }
+    // Method 3: Source Code Fingerprinting (Medium/High Confidence, Medium Cost)
+    console.log('Method 3: Source Code Fingerprinting');
+    const fingerprintResult = await analyzeSourceFingerprints(page, content);
+    if (fingerprintResult.provider) {
+      return { ...details, ...fingerprintResult, detectionMethod: 'fingerprint', confidence: fingerprintResult.confidence || 'medium' };
     }
     
-    // Detect booking features
-    const features = [
-      { pattern: /calendar|date.*picker/i, feature: 'Date Selection' },
-      { pattern: /availability|available/i, feature: 'Real-time Availability' },
-      { pattern: /guest.*count|occupancy/i, feature: 'Guest Management' },
-      { pattern: /room.*type|accommodation/i, feature: 'Room Selection' },
-      { pattern: /price|rate|cost/i, feature: 'Dynamic Pricing' },
-      { pattern: /payment|checkout/i, feature: 'Online Payment' },
-      { pattern: /confirmation|booking.*reference/i, feature: 'Booking Confirmation' },
-      { pattern: /cancel|modification/i, feature: 'Cancellation Policy' },
-      { pattern: /special.*request|preferences/i, feature: 'Special Requests' },
-      { pattern: /loyalty|rewards/i, feature: 'Loyalty Program' }
-    ];
-    
-    for (const item of features) {
-      if (item.pattern.test(allContent)) {
-        details.features.push(item.feature);
-      }
+    // Method 4: Network Request Analysis (Highest Confidence, High Cost)
+    console.log('Method 4: Network Request Analysis');
+    const networkResult = await analyzeNetworkRequests(page);
+    if (networkResult.provider) {
+      return { ...details, ...networkResult, detectionMethod: 'network', confidence: 'high' };
     }
     
-    // Check for custom-built systems
-    if (!details.provider && details.features.length > 3) {
+    // Fallback: Feature-based detection
+    console.log('Fallback: Feature-based detection');
+    await detectBookingFeatures(page, content, details);
+    await detectThirdPartyServices(page, content, details);
+    
+    if (details.features.length > 3) {
       details.platform = 'Custom Built';
+      details.confidence = 'medium';
     }
+    
+    details.detectionMethod = 'fallback';
     
   } catch (error) {
-    console.error('Error detecting booking system:', error);
+    console.error('Error in booking system detection:', error);
   } finally {
     if (browser) {
       try {
@@ -276,13 +235,297 @@ async function detectBookingSystem(url: string): Promise<BookingSystemDetails> {
     }
   }
   
+  console.log(`Detection complete. Result: ${details.provider || details.platform || 'Unknown'} (${details.confidence})`);
   return details;
+}
+
+// Method 1: URL/Domain Analysis
+async function analyzeBookingDomain(bookingUrl: string, homepageUrl?: string): Promise<Partial<BookingSystemDetails>> {
+  try {
+    const bookingDomain = new URL(bookingUrl);
+    const homepageDomain = homepageUrl ? new URL(homepageUrl) : null;
+    
+    // Known booking engine domains
+    const knownDomains = [
+      { pattern: /retailint-tickets\.com/i, name: 'Retail Integration' },
+      { pattern: /p3hotels\.com/i, name: 'P3 Hotel Software' },
+      { pattern: /bookassist\.com/i, name: 'BookAssist' },
+      { pattern: /cloudbeds\.com/i, name: 'Cloudbeds' },
+      { pattern: /booking\.com/i, name: 'Booking.com' },
+      { pattern: /expedia\.com/i, name: 'Expedia' },
+      { pattern: /vivaticket\.com/i, name: 'Vivaticket' },
+      { pattern: /opentable\.com/i, name: 'OpenTable' },
+      { pattern: /resy\.com/i, name: 'Resy' },
+      { pattern: /fareharbor\.com/i, name: 'FareHarbor' },
+      { pattern: /checkfront\.com/i, name: 'Checkfront' },
+      { pattern: /rezdy\.com/i, name: 'Rezdy' },
+      { pattern: /trekksoft\.com/i, name: 'TrekkSoft' },
+      { pattern: /guestline\.com/i, name: 'Guestline' },
+      { pattern: /siteminder\.com/i, name: 'SiteMinder' }
+    ];
+    
+    // Check if booking page is on a different, recognizable domain
+    for (const domain of knownDomains) {
+      if (domain.pattern.test(bookingDomain.hostname)) {
+        console.log(`Domain match found: ${domain.name} (${bookingDomain.hostname})`);
+        return { provider: domain.name };
+      }
+    }
+    
+    // Check for subdomain patterns
+    if (homepageDomain && bookingDomain.hostname !== homepageDomain.hostname) {
+      const subdomainPatterns = [
+        { pattern: /^book\.|^booking\.|^reservations?\.|^tickets?\./i, inference: 'Third-party booking system' },
+        { pattern: /^shop\.|^store\./i, inference: 'E-commerce platform' }
+      ];
+      
+      for (const pattern of subdomainPatterns) {
+        if (pattern.pattern.test(bookingDomain.hostname)) {
+          console.log(`Subdomain pattern detected: ${pattern.inference}`);
+          return { platform: pattern.inference };
+        }
+      }
+    }
+    
+  } catch (error) {
+    console.error('Domain analysis error:', error);
+  }
+  
+  return {};
+}
+
+// Method 2: Footer/Branding Analysis  
+async function analyzeFooterBranding(page: any, content: string): Promise<Partial<BookingSystemDetails>> {
+  try {
+    // Look for footer branding
+    const footerBranding = await page.evaluate(() => {
+      const footers = document.querySelectorAll('footer, .footer, #footer');
+      const brandingPatterns = [
+        /booking\s+engine\s+by\s+([^<\n]+)/i,
+        /powered\s+by\s+([^<\n]+)/i,
+        /hotel\s+software\s+by\s+([^<\n]+)/i,
+        /reservations\s+by\s+([^<\n]+)/i
+      ];
+      
+      for (const footer of Array.from(footers)) {
+        const footerText = footer.textContent || '';
+        const footerHtml = footer.innerHTML || '';
+        
+        for (const pattern of brandingPatterns) {
+          const textMatch = footerText.match(pattern);
+          const htmlMatch = footerHtml.match(pattern);
+          
+          if (textMatch) return textMatch[1].trim();
+          if (htmlMatch) return htmlMatch[1].trim();
+        }
+        
+        // Check for specific links
+        const links = footer.querySelectorAll('a[href]');
+        for (const link of links) {
+          const href = link.getAttribute('href') || '';
+          const text = link.textContent || '';
+          
+          if (href.includes('p3hotels.com') && text.toLowerCase().includes('booking engine')) {
+            return 'P3 Hotel Software';
+          }
+          if (href.includes('bookassist.com')) return 'BookAssist';
+          if (href.includes('vivaticket.com')) return 'Vivaticket';
+        }
+      }
+      
+      return null;
+    });
+    
+    if (footerBranding) {
+      console.log(`Footer branding found: ${footerBranding}`);
+      return { provider: footerBranding };
+    }
+    
+  } catch (error) {
+    console.error('Footer analysis error:', error);
+  }
+  
+  return {};
+}
+
+// Method 3: Source Code Fingerprinting
+async function analyzeSourceFingerprints(page: any, content: string): Promise<Partial<BookingSystemDetails>> {
+  try {
+    // A) Branded Code Artifacts
+    const brandedArtifacts = [
+      { pattern: /p3core\.js|p3\/|\/p3\//i, name: 'P3 Hotel Software', confidence: 'high' as const },
+      { pattern: /bookassist|book-assist/i, name: 'BookAssist', confidence: 'high' as const },
+      { pattern: /vivaticket|bestUnionBody/i, name: 'Vivaticket', confidence: 'high' as const },
+      { pattern: /retailint|retail-integration/i, name: 'Retail Integration', confidence: 'high' as const },
+      { pattern: /cloudbeds/i, name: 'Cloudbeds', confidence: 'high' as const },
+      { pattern: /trekksoft/i, name: 'TrekkSoft', confidence: 'high' as const }
+    ];
+    
+    for (const artifact of brandedArtifacts) {
+      if (artifact.pattern.test(content)) {
+        console.log(`Branded artifact found: ${artifact.name}`);
+        return { provider: artifact.name, confidence: artifact.confidence };
+      }
+    }
+    
+    // B) Technology Stack Fingerprints
+    const techStack = await page.evaluate(() => {
+      const indicators = {
+        aspNet: false,
+        angular: false,
+        react: false,
+        vue: false
+      };
+      
+      // ASP.NET detection
+      if (document.querySelector('form#aspnetForm') || 
+          document.querySelector('input[name="__VIEWSTATE"]') ||
+          document.body && document.body.innerHTML.includes('WebResource.axd')) {
+        indicators.aspNet = true;
+      }
+      
+      // Angular detection
+      if (document.querySelector('app-root') || (window as any).angular) {
+        indicators.angular = true;
+      }
+      
+      // React detection
+      if (document.querySelector('#root') && document.querySelector('[data-reactroot]')) {
+        indicators.react = true;
+      }
+      
+      // Vue detection
+      if (document.querySelector('#app') || (window as any).Vue) {
+        indicators.vue = true;
+      }
+      
+      return indicators;
+    });
+    
+    // Infer providers based on tech stack
+    if (techStack.aspNet) {
+      // ASP.NET often used by enterprise systems like Vivaticket
+      if (content.includes('ctl00$')) {
+        console.log('ASP.NET Web Forms detected - likely enterprise booking system');
+        return { platform: 'Enterprise ASP.NET Booking System', confidence: 'medium' };
+      }
+    }
+    
+    if (techStack.angular) {
+      // Angular often used by modern providers like Retail Integration
+      console.log('Angular framework detected');
+      return { platform: 'Modern Angular-based Booking System', confidence: 'medium' };
+    }
+    
+  } catch (error) {
+    console.error('Fingerprint analysis error:', error);
+  }
+  
+  return {};
+}
+
+// Method 4: Network Request Analysis
+async function analyzeNetworkRequests(page: any): Promise<Partial<BookingSystemDetails>> {
+  try {
+    const apiEndpoints: string[] = [];
+    
+    // Set up request monitoring
+    page.on('request', (request: any) => {
+      const url = request.url();
+      if (url.includes('api') || url.includes('ajax') || url.includes('booking') || url.includes('availability')) {
+        apiEndpoints.push(url);
+      }
+    });
+    
+    // Try to trigger some network activity
+    await page.evaluate(() => {
+      // Try clicking date pickers or other interactive elements
+      const dateInputs = document.querySelectorAll('input[type="date"], .datepicker, .calendar');
+      if (dateInputs.length > 0) {
+        (dateInputs[0] as any).click?.();
+      }
+    });
+    
+    // Wait a bit for any async requests
+    await page.waitForTimeout(2000);
+    
+    // Analyze collected endpoints
+    for (const endpoint of apiEndpoints) {
+      try {
+        const domain = new URL(endpoint).hostname;
+        
+        const apiProviders = [
+          { pattern: /api\.bookassist\.com/i, name: 'BookAssist' },
+          { pattern: /api\.cloudbeds\.com/i, name: 'Cloudbeds' },
+          { pattern: /api\.vivaticket\.com/i, name: 'Vivaticket' },
+          { pattern: /api\.p3hotels\.com/i, name: 'P3 Hotel Software' },
+          { pattern: /retailint.*api/i, name: 'Retail Integration' }
+        ];
+        
+        for (const provider of apiProviders) {
+          if (provider.pattern.test(domain)) {
+            console.log(`API endpoint detected: ${provider.name} (${domain})`);
+            return { provider: provider.name };
+          }
+        }
+      } catch (e) {
+        // Invalid URL, skip
+      }
+    }
+    
+  } catch (error) {
+    console.error('Network analysis error:', error);
+  }
+  
+  return {};
+}
+
+// Helper functions for fallback detection
+async function detectBookingFeatures(page: any, content: string, details: BookingSystemDetails) {
+  const features = [
+    { pattern: /calendar|date.*picker/i, feature: 'Date Selection' },
+    { pattern: /availability|available/i, feature: 'Real-time Availability' },
+    { pattern: /guest.*count|occupancy/i, feature: 'Guest Management' },
+    { pattern: /room.*type|accommodation/i, feature: 'Room Selection' },
+    { pattern: /price|rate|cost/i, feature: 'Dynamic Pricing' },
+    { pattern: /payment|checkout/i, feature: 'Online Payment' },
+    { pattern: /confirmation|booking.*reference/i, feature: 'Booking Confirmation' },
+    { pattern: /cancel|modification/i, feature: 'Cancellation Policy' },
+    { pattern: /special.*request|preferences/i, feature: 'Special Requests' },
+    { pattern: /loyalty|rewards/i, feature: 'Loyalty Program' }
+  ];
+  
+  for (const item of features) {
+    if (item.pattern.test(content)) {
+      details.features.push(item.feature);
+    }
+  }
+}
+
+async function detectThirdPartyServices(page: any, content: string, details: BookingSystemDetails) {
+  const services = [
+    { pattern: /google.*analytics/i, name: 'Google Analytics' },
+    { pattern: /stripe/i, name: 'Stripe Payments' },
+    { pattern: /paypal/i, name: 'PayPal' },
+    { pattern: /square/i, name: 'Square Payments' },
+    { pattern: /adyen/i, name: 'Adyen' },
+    { pattern: /braintree/i, name: 'Braintree' },
+    { pattern: /trustpilot/i, name: 'Trustpilot' },
+    { pattern: /tripadvisor/i, name: 'TripAdvisor' }
+  ];
+  
+  for (const service of services) {
+    if (service.pattern.test(content)) {
+      details.thirdParties.push(service.name);
+    }
+  }
 }
 
 async function analyzeEcommercePage(
   url: string, 
   pageType: string,
-  securityData: any
+  securityData: any,
+  homepageUrl?: string
 ): Promise<PageScanResult['ecommerceAnalysis']> {
   // Analyze ecommerce-specific features
   const analysis: PageScanResult['ecommerceAnalysis'] = {
@@ -311,7 +554,7 @@ async function analyzeEcommercePage(
     analysis.hasBookingSystem = true;
     // Detect booking system details (non-blocking)
     try {
-      analysis.bookingSystemDetails = await detectBookingSystem(url);
+      analysis.bookingSystemDetails = await detectBookingSystem(url, homepageUrl);
     } catch (error) {
       console.error('Failed to detect booking system details:', error);
       // Continue without booking system details
@@ -468,7 +711,7 @@ function generateEcommerceSummary(
     if (summary.securityScore < 80) {
       summary.recommendations.push("Improve security on ecommerce pages - implement HTTPS, CSP, and other security headers");
     }
-    if (!ecommerceResults.some(r => r.ecommerceAnalysis?.trustSignals?.length > 2)) {
+    if (!ecommerceResults.some(r => (r.ecommerceAnalysis?.trustSignals?.length || 0) > 2)) {
       summary.recommendations.push("Add more trust signals (security badges, SSL certificates, customer reviews)");
     }
   }

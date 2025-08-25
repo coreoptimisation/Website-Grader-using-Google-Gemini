@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Search, Plus, History, FileText, Settings, SearchCode, Trash2 } from "lucide-react";
+import { Search, Plus, History, FileText, Settings, SearchCode, Trash2, Menu, X } from "lucide-react";
 import ScanForm from "@/components/scan-form";
 import ScanProgress from "@/components/scan-progress";
 import PillarScores from "@/components/pillar-scores";
@@ -24,6 +24,7 @@ export default function Dashboard() {
   const [activeScanId, setActiveScanId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<'dashboard' | 'history'>('dashboard');
   const [isViewingIndividualPage, setIsViewingIndividualPage] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { toast } = useToast();
 
   const { data: recentScans } = useQuery({
@@ -84,18 +85,46 @@ export default function Dashboard() {
     }
   };
 
-  // When scan completes, invalidate queries to update the UI
+  // When scan completes, invalidate queries to update the UI and show toast
   useEffect(() => {
     if (isCompleted && activeScanId) {
       queryClient.invalidateQueries({ queryKey: ['/api/scans'] });
       queryClient.invalidateQueries({ queryKey: ['/api/scans', activeScanId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/scans', activeScanId, 'evidence'] });
+      
+      // Show completion toast
+      toast({
+        title: "Scan Complete!",
+        description: "Your multi-page website analysis has finished. Review the comprehensive results below.",
+      });
     }
-  }, [isCompleted, activeScanId]);
+  }, [isCompleted, activeScanId, toast]);
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex relative">
+      {/* Mobile Menu Button */}
+      <button
+        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-md"
+        data-testid="mobile-menu-toggle"
+      >
+        {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+      </button>
+
+      {/* Mobile Overlay */}
+      {isSidebarOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar Navigation */}
-      <aside className="w-64 bg-white shadow-sm border-r border-slate-200 flex flex-col" data-testid="sidebar">
+      <aside className={`
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        lg:translate-x-0 fixed lg:relative w-64 h-full bg-white shadow-sm border-r border-slate-200 flex flex-col
+        transition-transform duration-300 ease-in-out z-40
+      `} data-testid="sidebar">
         <div className="p-6 border-b border-slate-200">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
@@ -115,6 +144,7 @@ export default function Dashboard() {
                 onClick={() => {
                   setCurrentView('dashboard');
                   setActiveScanId(null);
+                  setIsSidebarOpen(false);
                 }}
                 className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg ${
                   currentView === 'dashboard' ? 'bg-primary text-white' : 'text-slate-600 hover:bg-slate-100'
@@ -127,7 +157,10 @@ export default function Dashboard() {
             </li>
             <li>
               <button
-                onClick={() => setCurrentView('dashboard')}
+                onClick={() => {
+                  setCurrentView('dashboard');
+                  setIsSidebarOpen(false);
+                }}
                 className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100"
                 data-testid="nav-new-scan"
               >
@@ -137,7 +170,10 @@ export default function Dashboard() {
             </li>
             <li>
               <button
-                onClick={() => setCurrentView('history')}
+                onClick={() => {
+                  setCurrentView('history');
+                  setIsSidebarOpen(false);
+                }}
                 className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg ${
                   currentView === 'history' ? 'bg-primary text-white' : 'text-slate-600 hover:bg-slate-100'
                 }`}
@@ -179,21 +215,21 @@ export default function Dashboard() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-hidden">
+      <main className="flex-1 overflow-hidden lg:ml-0">
         {/* Header */}
-        <header className="bg-white border-b border-slate-200 px-6 py-4">
+        <header className="bg-white border-b border-slate-200 px-4 sm:px-6 py-4 pl-16 lg:pl-6">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-semibold text-slate-900">Website Analysis Dashboard</h2>
               <p className="text-sm text-slate-600">Comprehensive site grading across 4 key pillars</p>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               <button 
-                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="px-3 sm:px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
                 data-testid="button-new-scan"
               >
-                <Plus className="w-4 h-4 mr-2" />
-                New Scan
+                <Plus className="w-4 h-4 sm:mr-2 inline" />
+                <span className="hidden sm:inline">New Scan</span>
               </button>
               <div className="w-8 h-8 bg-slate-300 rounded-full" data-testid="user-avatar"></div>
             </div>
@@ -201,7 +237,7 @@ export default function Dashboard() {
         </header>
 
         {/* Content Area */}
-        <div className="p-6 overflow-y-auto h-full">
+        <div className="p-4 sm:p-6 overflow-y-auto h-full">
           {/* Scan History View */}
           {currentView === 'history' && (
             <Card className="p-6">
@@ -211,7 +247,7 @@ export default function Dashboard() {
                   {(recentScans as any).map((scan: any) => (
                     <div 
                       key={scan.id} 
-                      className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50"
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 gap-2"
                       data-testid={`history-scan-${scan.id}`}
                     >
                       <div 
@@ -226,10 +262,10 @@ export default function Dashboard() {
                           {new Date(scan.createdAt).toLocaleDateString()} at {new Date(scan.createdAt).toLocaleTimeString()}
                         </p>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 justify-between sm:justify-end">
                         {scan.overallScore !== null && (
                           <div className="text-right">
-                            <div className="text-2xl font-bold text-slate-900">{scan.overallScore}</div>
+                            <div className="text-xl sm:text-2xl font-bold text-slate-900">{scan.overallScore}</div>
                             <div className={`text-xs font-medium ${
                               scan.grade === 'A' ? 'text-green-600' :
                               scan.grade === 'B' ? 'text-blue-600' :
@@ -276,8 +312,8 @@ export default function Dashboard() {
               {/* URL Input Section */}
               <ScanForm onScanStarted={handleScanStarted} />
 
-              {/* Current Scan Progress */}
-              {activeScanId && (isScanning || scanLoading) && (
+              {/* Current Scan Progress - Only show when actively scanning */}
+              {activeScanId && isScanning && (
                 <ScanProgress 
                   scanId={activeScanId} 
                   url={(activeScanData as any)?.scan?.url} 
@@ -371,7 +407,7 @@ export default function Dashboard() {
                       {(recentScans as any).map((scan: any) => (
                         <div 
                           key={scan.id} 
-                          className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer"
+                          className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer gap-2"
                           onClick={() => setActiveScanId(scan.id)}
                           data-testid={`scan-item-${scan.id}`}
                         >
@@ -381,10 +417,10 @@ export default function Dashboard() {
                               {new Date(scan.createdAt).toLocaleDateString()}
                             </p>
                           </div>
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 justify-between sm:justify-end">
                             {scan.overallScore !== null && (
                               <div className="text-right">
-                                <div className="text-xl font-bold text-slate-900">{scan.overallScore}</div>
+                                <div className="text-lg sm:text-xl font-bold text-slate-900">{scan.overallScore}</div>
                                 <div className={`text-xs font-medium ${
                                   scan.grade === 'A' ? 'text-green-600' :
                                   scan.grade === 'B' ? 'text-blue-600' :
