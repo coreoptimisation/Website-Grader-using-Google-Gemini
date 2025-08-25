@@ -41,10 +41,16 @@ export interface AgentReadinessResult {
 }
 
 export async function runAgentReadinessAudit(url: string): Promise<AgentReadinessResult> {
+  // Check if we're in development (has the Nix chromium path)
+  const devChromiumPath = '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium';
+  const fs = await import('fs');
+  const useDevPath = fs.existsSync(devChromiumPath);
+  
   let browser;
   try {
     browser = await chromium.launch({ 
       headless: true,
+      ...(useDevPath ? { executablePath: devChromiumPath } : {}),
       args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
   } catch (launchError) {

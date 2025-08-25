@@ -14,12 +14,17 @@ export interface AccessibilityResult {
 }
 
 export async function runAccessibilityAudit(url: string): Promise<AccessibilityResult> {
+  // Check if we're in development (has the Nix chromium path)
+  const devChromiumPath = '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium';
+  const fs = await import('fs');
+  const useDevPath = fs.existsSync(devChromiumPath);
+  
   let browser;
   try {
-    // Try to launch browser without hardcoded path (uses Playwright's bundled browser)
     browser = await chromium.launch({ 
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'] // Required for some production environments
+      ...(useDevPath ? { executablePath: devChromiumPath } : {}),
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
   } catch (launchError) {
     console.error('Failed to launch browser for accessibility audit:', launchError);
