@@ -32,6 +32,7 @@ export default function ScanForm({ onScanStarted }: ScanFormProps) {
   const [additionalUrls, setAdditionalUrls] = useState<string[]>([]);
   const [newUrl, setNewUrl] = useState("");
   const [urlError, setUrlError] = useState("");
+  const [scanMode, setScanMode] = useState<'manual' | 'automatic'>('automatic');
 
   const form = useForm<ScanFormData>({
     resolver: zodResolver(scanFormSchema),
@@ -45,18 +46,23 @@ export default function ScanForm({ onScanStarted }: ScanFormProps) {
   });
 
   const createScanMutation = useMutation({
-    mutationFn: async (data: { url: string; selectedUrls: string[] }) => {
+    mutationFn: async (data: { url: string; selectedUrls?: string[] }) => {
       const response = await apiRequest("POST", "/api/scans", { ...data, multiPage: true });
       return response.json();
     },
     onSuccess: (data) => {
       onScanStarted(data.scanId);
       queryClient.invalidateQueries({ queryKey: ['/api/scans'] });
+      const message = scanMode === 'manual' 
+        ? `Analyzing ${additionalUrls.length + 1} selected page${additionalUrls.length > 0 ? 's' : ''}.`
+        : "Automatically discovering and analyzing key pages across your website.";
       toast({
         title: "Scan Started",
-        description: `Analyzing ${additionalUrls.length + 1} page${additionalUrls.length > 0 ? 's' : ''} of your website. This may take a few minutes.`,
+        description: `${message} This may take a few minutes.`,
       });
       form.reset();
+      setAdditionalUrls([]);
+      setNewUrl("");
     },
     onError: (error) => {
       toast({
@@ -69,9 +75,14 @@ export default function ScanForm({ onScanStarted }: ScanFormProps) {
   });
 
   const onSubmit = (data: ScanFormData) => {
-    // Always include the homepage plus any additional URLs
-    const selectedUrls = [data.url, ...additionalUrls];
-    createScanMutation.mutate({ url: data.url, selectedUrls });
+    if (scanMode === 'manual') {
+      // Manual mode: send selected URLs
+      const selectedUrls = [data.url, ...additionalUrls];
+      createScanMutation.mutate({ url: data.url, selectedUrls });
+    } else {
+      // Automatic mode: let the scanner discover pages
+      createScanMutation.mutate({ url: data.url });
+    }
   };
 
   const addUrl = () => {
@@ -107,12 +118,45 @@ export default function ScanForm({ onScanStarted }: ScanFormProps) {
   return (
     <Card className="p-4 sm:p-6 mb-6" data-testid="scan-form">
       <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-2">Analyze Your Website</h3>
-      <p className="text-xs sm:text-sm text-slate-600 mb-4">Select specific pages to analyze. The homepage will always be included in the analysis.</p>
+      
+      {/* Scan Mode Toggle */}
+      <div className="flex gap-2 mb-4">
+        <button
+          type="button"
+          onClick={() => setScanMode('automatic')}
+          className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+            scanMode === 'automatic'
+              ? 'bg-primary text-white'
+              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+          }`}
+          data-testid="mode-automatic"
+        >
+          Automatic Multi-Scan
+        </button>
+        <button
+          type="button"
+          onClick={() => setScanMode('manual')}
+          className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+            scanMode === 'manual'
+              ? 'bg-primary text-white'
+              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+          }`}
+          data-testid="mode-manual"
+        >
+          Select Specific Pages
+        </button>
+      </div>
+      
+      <p className="text-xs sm:text-sm text-slate-600 mb-4">
+        {scanMode === 'automatic' 
+          ? "Automatically discovers and analyzes critical pages including homepage, product/service pages, and checkout/booking flows."
+          : "Choose specific pages to analyze. The homepage will always be included."}
+      </p>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0">
           <div className="flex-1">
             <Label htmlFor="website-url" className="block text-sm font-medium text-slate-700 mb-2">
-              Homepage URL (Required)
+              {scanMode === 'automatic' ? 'Website URL' : 'Homepage URL (Required)'}
             </Label>
             <Input
               id="website-url"
@@ -138,15 +182,18 @@ export default function ScanForm({ onScanStarted }: ScanFormProps) {
             >
               <Search className="w-4 h-4 mr-2" />
               <span className="hidden sm:inline">{createScanMutation.isPending ? 
-                `Analyzing ${additionalUrls.length + 1} page${additionalUrls.length > 0 ? 's' : ''}...` : 
-                `Analyze ${additionalUrls.length + 1} Page${additionalUrls.length > 0 ? 's' : ''}`
+                "Starting Scan..." : 
+                scanMode === 'manual' 
+                  ? `Analyze ${additionalUrls.length + 1} Page${additionalUrls.length > 0 ? 's' : ''}`
+                  : "Start Automatic Scan"
               }</span>
               <span className="sm:hidden">{createScanMutation.isPending ? "Scanning..." : "Analyze"}</span>
             </Button>
           </div>
         </div>
         
-        {/* Additional URLs Section */}
+        {/* Additional URLs Section - Only show in manual mode */}
+        {scanMode === 'manual' && (
         <div className="border-t pt-4">
           <Label className="block text-sm font-medium text-slate-700 mb-2">
             Additional Pages to Analyze (Optional)
@@ -211,7 +258,7 @@ export default function ScanForm({ onScanStarted }: ScanFormProps) {
             </p>
           )}
         </div>
-        
+        )}
         {/* Scan Options */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 pt-4 border-t border-slate-200">
           <div className="flex items-center space-x-2">
