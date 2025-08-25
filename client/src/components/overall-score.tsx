@@ -34,9 +34,8 @@ function getImpactColor(impact: string): string {
 }
 
 function getPriorityColor(priority: number): string {
-  if (priority <= 2) return 'bg-danger text-white';
-  if (priority <= 4) return 'bg-warning text-white';
-  return 'bg-primary text-white';
+  // All numbered badges should have consistent styling since they just indicate order
+  return 'bg-slate-600 text-white';
 }
 
 export default function OverallScore({ report, results }: OverallScoreProps) {
