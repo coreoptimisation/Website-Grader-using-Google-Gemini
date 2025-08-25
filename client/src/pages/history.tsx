@@ -17,7 +17,7 @@ export default function History() {
 
   const deleteScanMutation = useMutation({
     mutationFn: async (scanId: string) => {
-      return await apiRequest(`/api/scans/${scanId}`, 'DELETE');
+      return await apiRequest('DELETE', `/api/scans/${scanId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/scans'] });
