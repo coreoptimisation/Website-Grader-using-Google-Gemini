@@ -15,7 +15,7 @@ import {
   users
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, inArray } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -27,8 +27,6 @@ export interface IStorage {
   getScan(id: string): Promise<Scan | undefined>;
   updateScanStatus(id: string, status: string, completedAt?: Date): Promise<void>;
   getRecentScans(limit?: number): Promise<Scan[]>;
-  getScansWithStatus(statuses: string[]): Promise<Scan[]>;
-  getRecentFailedScans(limit?: number): Promise<Scan[]>;
   
   // Scan results operations
   createScanResult(result: InsertScanResult): Promise<ScanResult>;
@@ -175,23 +173,6 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(scans)
       .where(eq(scans.id, scanId));
-  }
-
-  async getScansWithStatus(statuses: string[]): Promise<Scan[]> {
-    return db
-      .select()
-      .from(scans)
-      .where(inArray(scans.status, statuses))
-      .orderBy(desc(scans.createdAt));
-  }
-
-  async getRecentFailedScans(limit = 5): Promise<Scan[]> {
-    return db
-      .select()
-      .from(scans)
-      .where(eq(scans.status, 'failed'))
-      .orderBy(desc(scans.createdAt))
-      .limit(limit);
   }
 }
 

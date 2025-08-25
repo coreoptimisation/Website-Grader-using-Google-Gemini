@@ -1,4 +1,4 @@
-import { browserPool } from "./browser-pool";
+import { chromium } from "playwright";
 import * as xml2js from "xml2js";
 
 export interface AgentReadinessResult {
@@ -41,15 +41,14 @@ export interface AgentReadinessResult {
 }
 
 export async function runAgentReadinessAudit(url: string): Promise<AgentReadinessResult> {
+  const browser = await chromium.launch({ 
+    headless: true,
+    executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium'
+  });
   const baseUrl = new URL(url).origin;
-  let context;
-  let page;
   
   try {
-    // Use shared browser pool to prevent resource exhaustion
-    const browser = await browserPool.getPlaywrightBrowser();
-    context = await browser.newContext();
-    page = await context.newPage();
+    const page = await browser.newPage();
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
     
     // Check robots.txt
@@ -93,9 +92,7 @@ export async function runAgentReadinessAudit(url: string): Promise<AgentReadines
     };
     
   } finally {
-    if (context) {
-      await context.close();
-    }
+    await browser.close();
   }
 }
 

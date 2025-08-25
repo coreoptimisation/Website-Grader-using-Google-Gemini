@@ -8,16 +8,6 @@ This is an AI-powered website analysis tool that provides comprehensive scoring 
 
 Preferred communication style: Simple, everyday language.
 
-## Recent Updates (August 25, 2025)
-
-### Browser Resource Management Fix (August 25, 2025)
-- **Root Cause Identified**: Multi-page scans were launching 21 separate browser instances (1 crawler + 5 scanners × 4 pages), exhausting production server resources
-- **Implemented Browser Pool**: Created `server/scanner/browser-pool.ts` with shared browser instances and concurrency control
-- **Updated All Scanners**: Modified accessibility, performance, security, agent-readiness, screenshot, and crawler modules to use shared browser pool
-- **Resource Impact**: Reduced browser usage from 21 instances to 1 shared instance for multi-page scans
-- **Production Fix**: Resolved issue where multi-page scans got stuck in "scanning" status on production while single-page scans worked
-- **Added Scan Timeouts**: Implemented 6-minute timeout for multi-page scans and 2-minute timeout for single-page scans to prevent hanging
-
 ## System Architecture
 
 ### Frontend Architecture
@@ -35,13 +25,11 @@ Preferred communication style: Simple, everyday language.
 - **Structured API**: Clear separation between routes, storage, and scanning logic
 
 ### Scanning Engine
-- **Centralized Browser Launcher**: Unified browser management across all scanner modules with automatic detection
 - **Playwright**: Headless browser automation for page interaction and screenshot capture
 - **Axe-core**: Automated accessibility testing with WCAG compliance checking
-- **Lighthouse**: Performance auditing and Core Web Vitals measurement via Puppeteer
+- **Lighthouse**: Performance auditing and Core Web Vitals measurement
 - **Custom Security Scanner**: HTTP header analysis and policy detection
 - **Agent Readiness Checker**: SEO, structured data, and crawlability assessment
-- **Multi-Page Scanner**: Sophisticated 4-page analysis with booking system detection
 
 ### AI Integration
 - **Google Gemini**: AI analysis using the official Google GenAI SDK

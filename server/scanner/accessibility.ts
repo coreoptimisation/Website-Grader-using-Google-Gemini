@@ -1,5 +1,5 @@
+import { chromium } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
-import { browserPool } from "./browser-pool";
 
 export interface AccessibilityResult {
   score: number;
@@ -14,14 +14,14 @@ export interface AccessibilityResult {
 }
 
 export async function runAccessibilityAudit(url: string): Promise<AccessibilityResult> {
-  let context;
-  let page;
+  const browser = await chromium.launch({ 
+    headless: true,
+    executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium'
+  });
   
   try {
-    // Use shared browser pool to prevent resource exhaustion
-    const browser = await browserPool.getPlaywrightBrowser();
-    context = await browser.newContext();
-    page = await context.newPage();
+    const context = await browser.newContext();
+    const page = await context.newPage();
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
     
     // Run axe-core accessibility audit
@@ -91,8 +91,6 @@ export async function runAccessibilityAudit(url: string): Promise<AccessibilityR
     };
     
   } finally {
-    if (context) {
-      await context.close();
-    }
+    await browser.close();
   }
 }

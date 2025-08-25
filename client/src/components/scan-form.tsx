@@ -9,19 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Zap, Layers, Info } from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Search } from "lucide-react";
 
 const scanFormSchema = z.object({
   url: z.string().url("Please enter a valid URL"),
-  scanType: z.enum(["single", "multi"]).default("multi"),
   accessibility: z.boolean().default(true),
   performance: z.boolean().default(true),
   security: z.boolean().default(true),
@@ -42,7 +34,6 @@ export default function ScanForm({ onScanStarted }: ScanFormProps) {
     resolver: zodResolver(scanFormSchema),
     defaultValues: {
       url: "",
-      scanType: "multi",
       accessibility: true,
       performance: true,
       security: true,
@@ -51,22 +42,16 @@ export default function ScanForm({ onScanStarted }: ScanFormProps) {
   });
 
   const createScanMutation = useMutation({
-    mutationFn: async (data: { url: string; scanType: string }) => {
-      const response = await apiRequest("POST", "/api/scans", { 
-        url: data.url, 
-        multiPage: data.scanType === "multi" 
-      });
+    mutationFn: async (data: { url: string }) => {
+      const response = await apiRequest("POST", "/api/scans", { ...data, multiPage: true });
       return response.json();
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (data) => {
       onScanStarted(data.scanId);
       queryClient.invalidateQueries({ queryKey: ['/api/scans'] });
-      const isMulti = variables.scanType === "multi";
       toast({
-        title: isMulti ? "Multi-Page Scan Started" : "Single-Page Scan Started",
-        description: isMulti 
-          ? "Analyzing 4 critical pages across your website including homepage, product pages, and checkout/booking functionality. This comprehensive analysis takes 3-6 minutes."
-          : "Quickly analyzing your homepage for key metrics. Results available in 30-60 seconds.",
+        title: "Multi-Page Scan Started",
+        description: "Analyzing multiple pages across your website including homepage, product pages, and checkout/booking functionality. This may take a few minutes.",
       });
       form.reset();
     },
@@ -81,119 +66,15 @@ export default function ScanForm({ onScanStarted }: ScanFormProps) {
   });
 
   const onSubmit = (data: ScanFormData) => {
-    createScanMutation.mutate({ url: data.url, scanType: data.scanType });
+    createScanMutation.mutate({ url: data.url });
   };
 
   return (
-    <Card className="p-4 sm:p-6 mb-6" data-testid="scan-form">
-      <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-2">Analyze Your Website</h3>
-      <p className="text-xs sm:text-sm text-slate-600 mb-4">Choose between a quick homepage scan or comprehensive multi-page analysis.</p>
+    <Card className="p-6 mb-6" data-testid="scan-form">
+      <h3 className="text-lg font-semibold text-slate-900 mb-2">Analyze Your Website (Multi-Page Analysis)</h3>
+      <p className="text-sm text-slate-600 mb-4">Automatically scans multiple pages including homepage, product pages, checkout/booking functionality, and more to provide comprehensive site-wide analysis.</p>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        {/* Scan Type Selector */}
-        <div className="space-y-3">
-          <Label className="text-sm font-medium text-slate-700">Scan Type</Label>
-          <RadioGroup 
-            value={form.watch("scanType")} 
-            onValueChange={(value) => form.setValue("scanType", value as "single" | "multi")}
-            className="grid grid-cols-1 md:grid-cols-2 gap-4"
-          >
-            {/* Single Page Option */}
-            <div className="relative">
-              <RadioGroupItem 
-                value="single" 
-                id="single-scan" 
-                className="peer sr-only" 
-              />
-              <Label 
-                htmlFor="single-scan" 
-                className={`flex flex-col p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                  form.watch("scanType") === "single" 
-                    ? "border-blue-600 bg-blue-50 ring-2 ring-blue-600 ring-offset-2" 
-                    : "border-gray-200 hover:bg-slate-50"
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-2">
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                      form.watch("scanType") === "single" 
-                        ? "border-blue-600 bg-blue-600" 
-                        : "border-gray-400"
-                    }`}>
-                      {form.watch("scanType") === "single" && (
-                        <div className="w-2 h-2 rounded-full bg-white" />
-                      )}
-                    </div>
-                    <Zap className="w-5 h-5 text-blue-600" />
-                    <span className="font-semibold text-slate-900">Quick Scan</span>
-                  </div>
-                  <span className="text-xs text-slate-500">30-60 seconds</span>
-                </div>
-                <div className="text-sm text-slate-600 space-y-1">
-                  <p>✓ Homepage only</p>
-                  <p>✓ Fast results</p>
-                  <p>✓ Core metrics</p>
-                </div>
-                <div className="mt-2 text-xs text-slate-500">
-                  <strong>Best for:</strong> Quick health checks, monitoring, or initial assessment
-                </div>
-              </Label>
-            </div>
-
-            {/* Multi Page Option */}
-            <div className="relative">
-              <RadioGroupItem 
-                value="multi" 
-                id="multi-scan" 
-                className="peer sr-only" 
-              />
-              <Label 
-                htmlFor="multi-scan" 
-                className={`flex flex-col p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                  form.watch("scanType") === "multi" 
-                    ? "border-blue-600 bg-blue-50 ring-2 ring-blue-600 ring-offset-2" 
-                    : "border-gray-200 hover:bg-slate-50"
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-2">
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                      form.watch("scanType") === "multi" 
-                        ? "border-blue-600 bg-blue-600" 
-                        : "border-gray-400"
-                    }`}>
-                      {form.watch("scanType") === "multi" && (
-                        <div className="w-2 h-2 rounded-full bg-white" />
-                      )}
-                    </div>
-                    <Layers className="w-5 h-5 text-blue-600" />
-                    <span className="font-semibold text-slate-900">Deep Analysis</span>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Info className="w-4 h-4 text-slate-400" />
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs">
-                          <p>Analyzes 4 critical pages: Homepage, Shop/Products, Checkout/Booking, and Trust/Content pages</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                  <span className="text-xs text-slate-500">3-6 minutes</span>
-                </div>
-                <div className="text-sm text-slate-600 space-y-1">
-                  <p>✓ 4 critical pages analyzed</p>
-                  <p>✓ E-commerce & booking detection</p>
-                  <p>✓ Site-wide issues identified</p>
-                  <p>✓ Comprehensive recommendations</p>
-                </div>
-                <div className="mt-2 text-xs text-slate-500">
-                  <strong>Best for:</strong> Full audits, pre-launch checks, or finding site-wide issues
-                </div>
-              </Label>
-            </div>
-          </RadioGroup>
-        </div>
-        <div className="flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0">
+        <div className="flex space-x-4">
           <div className="flex-1">
             <Label htmlFor="website-url" className="block text-sm font-medium text-slate-700 mb-2">
               Website URL
@@ -216,19 +97,18 @@ export default function ScanForm({ onScanStarted }: ScanFormProps) {
             <Button 
               type="submit" 
               disabled={createScanMutation.isPending}
-              className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 font-medium"
+              className="px-6 py-3 font-medium"
               data-testid="button-start-scan"
               title="Analyzes multiple pages including homepage, product pages, and checkout/booking functionality"
             >
               <Search className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">{createScanMutation.isPending ? "Starting Scan..." : "Analyze Website"}</span>
-              <span className="sm:hidden">{createScanMutation.isPending ? "Scanning..." : "Analyze"}</span>
+              {createScanMutation.isPending ? "Starting Multi-Page Scan..." : "Analyze Website"}
             </Button>
           </div>
         </div>
         
         {/* Scan Options */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 pt-4 border-t border-slate-200">
+        <div className="grid grid-cols-4 gap-4 pt-4 border-t border-slate-200">
           <div className="flex items-center space-x-2">
             <Checkbox 
               id="accessibility"

@@ -1,4 +1,4 @@
-import { browserPool } from "./browser-pool";
+import { chromium } from "playwright";
 import { analyzeSSLCertificate, evaluateSSLSecurity } from "./ssl";
 
 export interface SecurityResult {
@@ -36,14 +36,13 @@ const POLICY_PATTERNS = {
 };
 
 export async function runSecurityAudit(url: string): Promise<SecurityResult> {
-  let context;
-  let page;
+  const browser = await chromium.launch({ 
+    headless: true,
+    executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium'
+  });
   
   try {
-    // Use shared browser pool to prevent resource exhaustion
-    const browser = await browserPool.getPlaywrightBrowser();
-    context = await browser.newContext();
-    page = await context.newPage();
+    const page = await browser.newPage();
     
     // Navigate and capture response headers
     const response = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
@@ -159,8 +158,6 @@ export async function runSecurityAudit(url: string): Promise<SecurityResult> {
     };
     
   } finally {
-    if (context) {
-      await context.close();
-    }
+    await browser.close();
   }
 }

@@ -1,5 +1,4 @@
-import { Browser, Page } from "playwright";
-import { browserPool } from "./browser-pool";
+import { chromium, Browser, Page } from "playwright";
 import robotsParser from "robots-parser";
 import * as xml2js from "xml2js";
 
@@ -24,7 +23,7 @@ export interface CrawlResult {
 export class WebCrawler {
   private browser: Browser | null = null;
   private visited = new Set<string>();
-  private maxPages = 4; // Focus on 4 critical pages: homepage, shop, booking, detail
+  private maxPages = 10; // Limit to prevent excessive crawling
   private domain: string = "";
   
   async crawl(startUrl: string): Promise<CrawlResult> {
@@ -32,8 +31,11 @@ export class WebCrawler {
       const url = new URL(startUrl);
       this.domain = url.origin;
       
-      // Use shared browser pool instead of launching new browser
-      this.browser = await browserPool.getPlaywrightBrowser();
+      // Launch browser
+      this.browser = await chromium.launch({ 
+        headless: true,
+        executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium'
+      });
       
       const result: CrawlResult = {
         urls: [],
@@ -51,8 +53,7 @@ export class WebCrawler {
       const sitemapUrls = await this.parseSitemap(url.origin);
       if (sitemapUrls.length > 0) {
         result.sitemap = sitemapUrls;
-        // Take first maxPages URLs from sitemap
-        result.urls = sitemapUrls.slice(0, this.maxPages);
+        result.urls = this.prioritizeUrls(sitemapUrls).slice(0, this.maxPages);
       }
       
       // Crawl the start page and discover links
@@ -70,7 +71,10 @@ export class WebCrawler {
       
       // If no sitemap, use discovered links
       if (result.urls.length === 0) {
-        result.urls = result.discoveredPages.map(p => p.url);
+        result.urls = result.discoveredPages
+          .sort((a, b) => b.priority - a.priority)
+          .slice(0, this.maxPages)
+          .map(p => p.url);
       }
       
       // Always include the homepage
@@ -90,8 +94,9 @@ export class WebCrawler {
         discoveredPages: [{ url: startUrl, type: "homepage", priority: 10 }]
       };
     } finally {
-      // Don't close the shared browser, it will be reused
-      // The browser pool manages browser lifecycle
+      if (this.browser) {
+        await this.browser.close();
+      }
     }
   }
   
@@ -169,30 +174,12 @@ export class WebCrawler {
           .filter(href => href && !href.startsWith('#') && !href.startsWith('javascript:'));
       });
       
-      // Include same domain + potential external booking/ecommerce domains
+      // Filter to same domain only
       const url = new URL(baseUrl);
       return links.filter(link => {
         try {
           const linkUrl = new URL(link);
-          // Always allow same domain
-          if (linkUrl.origin === url.origin) return true;
-          
-          // Allow external domains ONLY for booking/commerce platforms (not social media)
-          const hostname = linkUrl.hostname.toLowerCase();
-          
-          // Exclude social media and irrelevant domains
-          const excludePatterns = ['facebook.com', 'twitter.com', 'instagram.com', 'youtube.com', 'linkedin.com', 'tiktok.com'];
-          if (excludePatterns.some(pattern => hostname.includes(pattern))) {
-            return false;
-          }
-          
-          // Only allow external domains that are clearly booking/ecommerce platforms
-          const commercePatterns = [
-            'book', 'reservation', 'reserve', 'ticket', 'appointment', 'booking',
-            'shop', 'store', 'cart', 'checkout', 'buy', 'order', 'secure', 'payment'
-          ];
-          
-          return commercePatterns.some(pattern => hostname.includes(pattern));
+          return linkUrl.origin === url.origin;
         } catch {
           return false;
         }
@@ -204,77 +191,34 @@ export class WebCrawler {
   }
   
   private categorizePages(urls: string[]): CrawlResult['discoveredPages'] {
-    const pages = urls.map(url => {
+    return urls.map(url => {
       const lower = url.toLowerCase();
-      const path = lower.split('/').filter(Boolean);
       
-      // 1. Homepage - highest priority
-      const cleanDomain = this.domain.replace('https://', '').replace('http://', '').replace('www.', '');
-      const cleanUrl = url.replace('https://', '').replace('http://', '').replace('www.', '');
-      
-      if (cleanUrl === cleanDomain || cleanUrl === cleanDomain + '/' || 
-          (url.endsWith('/') && path.length <= 1 && url.includes(cleanDomain))) {
-        return { url, type: "homepage" as const, priority: 10 };
+      // Detect page type based on URL patterns
+      if (lower.includes('/cart') || lower.includes('/basket') || lower.includes('/bag')) {
+        return { url, type: "cart" as const, priority: 9 };
       }
-      
-      // 2a. Ecommerce Pages - shopping, purchasing, products
-      if (lower.includes('/shop') || lower.includes('/store') || lower.includes('/buy') ||
-          lower.includes('/products') || lower.includes('/catalog') || lower.includes('/merchandise') ||
-          lower.includes('/gifts') || lower.includes('/retail')) {
-        return { url, type: "product" as const, priority: 9 };
+      if (lower.includes('/checkout') || lower.includes('/payment') || lower.includes('/pay')) {
+        return { url, type: "checkout" as const, priority: 10 };
       }
-      
-      // 2b. Booking/Reservation Pages - any appointment or reservation system
-      if (lower.includes('/book') || lower.includes('/reservation') || lower.includes('/reserve') ||
-          lower.includes('/appointment') || lower.includes('/booking') || lower.includes('/schedule') ||
-          lower.includes('/tickets') || lower.includes('/register') || lower.includes('/enroll') ||
-          // External domain patterns for booking systems
-          this.isExternalBookingDomain(url)) {
+      if (lower.includes('/book') || lower.includes('/reservation') || lower.includes('/appointment')) {
         return { url, type: "booking" as const, priority: 9 };
       }
-      
-      // 2c. Ecommerce Checkout - shopping cart/payment systems
-      if (lower.includes('/checkout') || lower.includes('/payment') || lower.includes('/pay') ||
-          lower.includes('/cart') || lower.includes('/basket') || lower.includes('/bag')) {
-        return { url, type: "checkout" as const, priority: 8 };
-      }
-      
-      // 3. Main Offerings Page - business service/product catalog pages
-      if (lower.includes('/services') || lower.includes('/offerings') || lower.includes('/packages') ||
-          lower.includes('/menu') || lower.includes('/treatments') || lower.includes('/classes') ||
-          lower.includes('/programs') || lower.includes('/courses') || lower.includes('/plans') ||
-          lower.includes('/categories') || lower.includes('/collection') || lower.includes('/gallery') ||
-          // Industry-specific patterns
-          lower.includes('/rooms') || lower.includes('/suites') || lower.includes('/accommodations') ||
-          lower.includes('/tours') || lower.includes('/experiences') || lower.includes('/activities') ||
-          lower.includes('/events') || lower.includes('/venues') || lower.includes('/facilities')) {
+      if (lower.includes('/product') || lower.includes('/item') || lower.includes('/shop') || lower.includes('/store')) {
         return { url, type: "product" as const, priority: 7 };
       }
-      
-      // 4. Specific Detail Page - individual product/service pages
-      // Look for URLs that seem to be specific items (longer paths, IDs, specific names)
-      if ((path.length >= 3 && !lower.includes('/category') && !lower.includes('/search')) ||
-          lower.includes('/room/') || lower.includes('/tour/') || lower.includes('/ticket/') ||
-          lower.includes('/suite/') || lower.includes('/package/') || lower.includes('/experience/') ||
-          /\/[a-z]+-[a-z]+-/.test(lower) || // hyphenated names like "deluxe-queen-room"
-          /\/\d+/.test(lower)) { // URLs with numbers like product IDs
-        return { url, type: "product" as const, priority: 7 };
-      }
-      
-      // Lower priority pages
       if (lower.includes('/contact') || lower.includes('/support')) {
-        return { url, type: "contact" as const, priority: 3 };
+        return { url, type: "contact" as const, priority: 6 };
       }
       if (lower.includes('/about')) {
-        return { url, type: "about" as const, priority: 3 };
+        return { url, type: "about" as const, priority: 5 };
+      }
+      if (url.endsWith('/') || url === this.domain) {
+        return { url, type: "homepage" as const, priority: 8 };
       }
       
-      return { url, type: "other" as const, priority: 1 };
+      return { url, type: "other" as const, priority: 3 };
     });
-    
-    // Filter and prioritize to get exactly 4 critical pages (homepage, shop, booking, detail)
-    const prioritized = this.selectCriticalPages(pages);
-    return prioritized;
   }
   
   private identifyEcommercePages(pages: CrawlResult['discoveredPages']): CrawlResult['ecommercePages'] {
@@ -312,72 +256,25 @@ export class WebCrawler {
     return ecommerce;
   }
   
-  private selectCriticalPages(pages: CrawlResult['discoveredPages']): CrawlResult['discoveredPages'] {
-    const result: CrawlResult['discoveredPages'] = [];
-    
-    // 1. Homepage - always essential (non-negotiable)
-    const homepage = pages.find(p => p.type === "homepage");
-    if (homepage) result.push(homepage);
-    
-    // 2. Main Offerings/Shop Page - essential for product discovery
-    const shopPages = pages.filter(p => p.type === "product" && p.priority === 9);
-    if (shopPages.length > 0) result.push(shopPages[0]);
-    
-    // 3. Booking/Checkout Page - essential for conversion (exclude social media)
-    const validBookingPages = pages.filter(p => {
-      if (p.type !== "booking") return false;
-      // Exclude social media domains
-      const url = p.url.toLowerCase();
-      return !url.includes('facebook.com') && !url.includes('twitter.com') && 
-             !url.includes('instagram.com') && !url.includes('youtube.com');
-    }).sort((a, b) => b.priority - a.priority);
-    if (validBookingPages.length > 0) result.push(validBookingPages[0]);
-    
-    // 4. High-Value Content/Trust-Building Page - supports purchase decision
-    const trustBuildingPages = pages.filter(p => {
-      if (result.some(r => r.url === p.url)) return false;
-      const url = p.url.toLowerCase();
-      return url.includes('/about') || url.includes('/contact') || url.includes('/location') ||
-             url.includes('/faq') || url.includes('/policy') || url.includes('/getting-here') ||
-             url.includes('/parking') || url.includes('/directions');
-    }).sort((a, b) => b.priority - a.priority);
-    
-    if (trustBuildingPages.length > 0 && result.length < 4) {
-      result.push(trustBuildingPages[0]);
-    }
-    
-    // 5. Fill remaining slots with highest priority remaining pages (exclude social media)
-    while (result.length < 4) {
-      const remainingPages = pages.filter(p => {
-        if (result.some(r => r.url === p.url)) return false;
-        const url = p.url.toLowerCase();
-        return !url.includes('facebook.com') && !url.includes('twitter.com') && 
-               !url.includes('instagram.com') && !url.includes('youtube.com');
-      }).sort((a, b) => b.priority - a.priority);
+  private prioritizeUrls(urls: string[]): string[] {
+    // Prioritize important pages
+    const prioritized = urls.map(url => {
+      const lower = url.toLowerCase();
+      let priority = 5;
       
-      if (remainingPages.length > 0) {
-        result.push(remainingPages[0]);
-      } else {
-        break;
-      }
-    }
+      if (url.endsWith('/') || !url.includes('/', 8)) priority = 10; // Homepage
+      else if (lower.includes('checkout') || lower.includes('cart')) priority = 9;
+      else if (lower.includes('book') || lower.includes('reservation')) priority = 9;
+      else if (lower.includes('product') || lower.includes('shop')) priority = 8;
+      else if (lower.includes('contact') || lower.includes('about')) priority = 7;
+      else if (lower.includes('blog') || lower.includes('news')) priority = 4;
+      else if (lower.includes('privacy') || lower.includes('terms')) priority = 2;
+      
+      return { url, priority };
+    });
     
-    return result.slice(0, 4); // Exactly 4 pages
-  }
-  
-  private isExternalBookingDomain(url: string): boolean {
-    try {
-      const hostname = new URL(url).hostname.toLowerCase();
-      const mainDomain = this.domain.replace('https://', '').replace('http://', '');
-      
-      // Skip if same domain
-      if (hostname.includes(mainDomain)) return false;
-      
-      // Check for booking/reservation patterns in external domains
-      const bookingPatterns = ['book', 'reservation', 'reserve', 'ticket', 'appointment', 'schedule'];
-      return bookingPatterns.some(pattern => hostname.includes(pattern));
-    } catch {
-      return false;
-    }
+    return prioritized
+      .sort((a, b) => b.priority - a.priority)
+      .map(item => item.url);
   }
 }

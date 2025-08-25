@@ -1,4 +1,4 @@
-import { browserPool } from "./browser-pool";
+import { chromium } from "playwright";
 import { mkdir, writeFile } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
@@ -15,12 +15,13 @@ export interface ScreenshotResult {
 }
 
 export async function captureScreenshot(url: string, scanId: string): Promise<ScreenshotResult> {
-  let context;
+  const browser = await chromium.launch({ 
+    headless: true,
+    executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium'
+  });
   
   try {
-    // Use shared browser pool to prevent resource exhaustion
-    const browser = await browserPool.getPlaywrightBrowser();
-    context = await browser.newContext({
+    const context = await browser.newContext({
       viewport: { width: 1920, height: 1080 }
     });
     const page = await context.newPage();
@@ -85,9 +86,7 @@ export async function captureScreenshot(url: string, scanId: string): Promise<Sc
       }
     };
   } finally {
-    if (context) {
-      await context.close();
-    }
+    await browser.close();
   }
 }
 
@@ -96,12 +95,13 @@ export async function captureElementScreenshot(
   selector: string, 
   scanId: string
 ): Promise<ScreenshotResult> {
-  let context;
+  const browser = await chromium.launch({ 
+    headless: true,
+    executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium'
+  });
   
   try {
-    // Use shared browser pool to prevent resource exhaustion
-    const browser = await browserPool.getPlaywrightBrowser();
-    context = await browser.newContext({
+    const context = await browser.newContext({
       viewport: { width: 1920, height: 1080 }
     });
     const page = await context.newPage();
@@ -145,7 +145,7 @@ export async function captureElementScreenshot(
     };
     
   } catch (error) {
-    console.error("Element screenshot failed:", error);
+    console.error("Element screenshot capture failed:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
@@ -156,8 +156,6 @@ export async function captureElementScreenshot(
       }
     };
   } finally {
-    if (context) {
-      await context.close();
-    }
+    await browser.close();
   }
 }

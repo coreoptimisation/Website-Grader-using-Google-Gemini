@@ -7,7 +7,6 @@ import { analyzeScreenshot } from "./gemini-visual";
 import { z } from "zod";
 import { calculateOverallScore, getGrade, getGradeExplanation } from "../shared/scoring";
 import { generateAgentActionBlueprint } from "./scanner/agent-blueprint";
-import { browserPool } from "./scanner/browser-pool";
 
 const scanRequestSchema = z.object({
   url: z.string().url("Invalid URL format"),
@@ -15,47 +14,11 @@ const scanRequestSchema = z.object({
   multiPage: z.boolean().optional().default(true) // Default to multi-page scanning
 });
 
-// Initialize global scan progress tracker
-if (!(global as any).scanProgress) {
-  (global as any).scanProgress = {};
-}
-
 export async function registerRoutes(app: Express): Promise<Server> {
   
-  // Health check with browser availability
-  app.get("/api/health", async (req, res) => {
-    try {
-      const browserHealthy = await browserPool.checkHealth();
-      
-      // Get system info for debugging production issues
-      const memUsage = process.memoryUsage();
-      const uptime = process.uptime();
-      
-      res.json({ 
-        status: browserHealthy ? "ok" : "degraded",
-        browser: browserHealthy ? "available" : "unavailable",
-        timestamp: new Date().toISOString(),
-        system: {
-          memoryUsage: {
-            rss: Math.round(memUsage.rss / 1024 / 1024) + ' MB',
-            heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024) + ' MB',
-            heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024) + ' MB'
-          },
-          uptime: Math.round(uptime) + ' seconds',
-          nodeVersion: process.version,
-          platform: process.platform,
-          environment: process.env.NODE_ENV || 'unknown'
-        }
-      });
-    } catch (error) {
-      console.error("Health check failed:", error);
-      res.status(503).json({ 
-        status: "error", 
-        browser: "unavailable",
-        error: error instanceof Error ? error.message : "Unknown error",
-        timestamp: new Date().toISOString()
-      });
-    }
+  // Health check
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
   // Start a new scan
@@ -83,7 +46,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get scan status and results with progress
+  // Get scan status and results
   app.get("/api/scans/:id", async (req, res) => {
     try {
       const scan = await storage.getScan(req.params.id);
@@ -93,18 +56,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const results = await storage.getScanResults(scan.id);
       const report = await storage.getScanReport(scan.id);
-      
-      // Include progress if scan is in progress
-      let progress = null;
-      if (scan.status === 'scanning' && (global as any).scanProgress?.[scan.id]) {
-        progress = (global as any).scanProgress[scan.id];
-      }
 
       res.json({
         scan,
         results,
-        report,
-        progress
+        report
       });
     } catch (error) {
       console.error("Error fetching scan:", error);
@@ -150,117 +106,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Debug endpoint to track scan issues on production
-  app.get("/api/debug/scans", async (req, res) => {
-    try {
-      // Get stuck or failed scans
-      const stuckScans = await storage.getScansWithStatus(['scanning', 'pending']);
-      const recentFailedScans = await storage.getRecentFailedScans(5);
-      
-      // Get scan progress info
-      const activeScanProgress = (global as any).scanProgress || {};
-      
-      res.json({
-        timestamp: new Date().toISOString(),
-        stuckScans: stuckScans.map(scan => ({
-          id: scan.id,
-          url: scan.url,
-          status: scan.status,
-          createdAt: scan.created_at,
-          updatedAt: scan.updated_at,
-          minutesStuck: Math.round((Date.now() - new Date(scan.created_at).getTime()) / 1000 / 60)
-        })),
-        recentFailedScans: recentFailedScans.map(scan => ({
-          id: scan.id,
-          url: scan.url,
-          status: scan.status,
-          createdAt: scan.created_at,
-          updatedAt: scan.updated_at
-        })),
-        activeScanProgress: Object.entries(activeScanProgress).map(([scanId, progress]) => ({
-          scanId,
-          progress
-        })),
-        totalActiveScans: Object.keys(activeScanProgress).length
-      });
-    } catch (error) {
-      console.error("Debug scans endpoint failed:", error);
-      res.status(500).json({ 
-        error: error instanceof Error ? error.message : "Unknown error",
-        timestamp: new Date().toISOString()
-      });
-    }
-  });
-
-  // Cleanup endpoint to reset stuck scans (use with caution)
-  app.post("/api/debug/cleanup-stuck-scans", async (req, res) => {
-    try {
-      const stuckScans = await storage.getScansWithStatus(['scanning', 'pending']);
-      const oldScans = stuckScans.filter(scan => 
-        Date.now() - new Date(scan.created_at).getTime() > 600000 // 10 minutes
-      );
-      
-      let cleanedCount = 0;
-      for (const scan of oldScans) {
-        await storage.updateScanStatus(scan.id, "failed");
-        cleanedCount++;
-      }
-      
-      // Clear any stuck progress tracking
-      if ((global as any).scanProgress) {
-        for (const scan of oldScans) {
-          delete (global as any).scanProgress[scan.id];
-        }
-      }
-      
-      res.json({
-        message: `Cleaned up ${cleanedCount} stuck scans`,
-        cleanedScans: oldScans.map(s => ({ id: s.id, url: s.url })),
-        timestamp: new Date().toISOString()
-      });
-    } catch (error) {
-      console.error("Cleanup failed:", error);
-      res.status(500).json({ 
-        error: error instanceof Error ? error.message : "Unknown error",
-        timestamp: new Date().toISOString()
-      });
-    }
-  });
-
   const httpServer = createServer(app);
   return httpServer;
 }
 
 async function processScan(scanId: string, url: string, multiPage: boolean = true) {
-  // Set a timeout for the entire scan process (4 minutes for multi-page, 90 seconds for single)
-  const scanTimeout = multiPage ? 240000 : 90000; // 4 minutes or 90 seconds  
-  
-  // Create timeout with proper cleanup
-  let timeoutId: NodeJS.Timeout;
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => {
-      console.error(`Scan ${scanId} timed out after ${scanTimeout/1000} seconds`);
-      reject(new Error(`Scan timeout exceeded (${scanTimeout/1000}s)`));
-    }, scanTimeout);
-  });
-  
   try {
-    console.log(`Processing scan ${scanId} for ${url} (${multiPage ? 'multi-page' : 'single-page'})`);
-    console.log(`Timeout set for ${scanTimeout/1000} seconds`);
-    
     // Update status to scanning
     await storage.updateScanStatus(scanId, "scanning");
     
-    // Run complete scan with screenshot capture, with timeout
-    console.log('Running complete scan...');
-    const scanResult = await Promise.race([
-      runCompleteScan(url, scanId, multiPage),
-      timeoutPromise
-    ]) as Awaited<ReturnType<typeof runCompleteScan>>;
-    
-    // Clear timeout if scan completed successfully
-    clearTimeout(timeoutId!);
-    console.log('Scan completed, processing results...');
+    // Run complete scan with screenshot capture
+    const scanResult = await runCompleteScan(url, scanId, multiPage);
     
     // Check if it's a multi-page scan result
     const isMultiPage = 'pageResults' in scanResult;
@@ -342,7 +198,7 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
           recommendations: []
         }
       ];
-    } else if (evidence) {
+    } else {
       pillarResults = [
         {
           scanId,
@@ -373,17 +229,12 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
           recommendations: []
         }
       ];
-    } else {
-      // Should not happen, but handle gracefully
-      throw new Error('No scan results available');
     }
 
     // Store pillar results
-    console.log('Storing pillar results...');
     await Promise.all(pillarResults.map(result => 
       storage.createScanResult(result)
     ));
-    console.log('Pillar results stored');
 
     // Run Gemini analysis with fallback handling
     let geminiAnalysis;
@@ -431,7 +282,7 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
         if (multiPageResult.pageResults?.[0]?.screenshot?.success) {
           screenshotPath = multiPageResult.pageResults[0].screenshot.filePath;
         }
-      } else if (evidence) {
+      } else {
         // Single-page scan
         if (evidence.screenshot?.success && evidence.screenshot?.filePath) {
           screenshotPath = evidence.screenshot.filePath;
@@ -472,26 +323,13 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
             sitemaps: evidence.agentReadiness.sitemaps?.found || false
           }
         };
-      } else {
-        throw new Error('No evidence available for analysis');
       }
       
-      // Add screenshot path to the summarized evidence
-      (summarizedEvidence as any).screenshotPath = screenshotPath;
-      
-      // Prepare evidence for Gemini analysis (remove extra properties)
-      const evidenceForAnalysis = {
-        url: summarizedEvidence.url,
-        accessibility: summarizedEvidence.accessibility,
-        performance: summarizedEvidence.performance,
-        security: summarizedEvidence.security,
-        agentReadiness: summarizedEvidence.agentReadiness,
-        screenshotPath: screenshotPath
-      };
+      summarizedEvidence.screenshotPath = screenshotPath;
       
       // Run visual analysis in parallel with main analysis
       const [mainAnalysis, visualInsights] = await Promise.all([
-        analyzeWebsiteFindings(evidenceForAnalysis),
+        analyzeWebsiteFindings(summarizedEvidence),
         screenshotPath ? analyzeScreenshot(screenshotPath, summarizedEvidence.url) : Promise.resolve(null)
       ]);
       
@@ -511,16 +349,11 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
         trust: (scanResult as any).aggregateScores.security,
         uxPerf: (scanResult as any).aggregateScores.performance,
         agentReadiness: (scanResult as any).aggregateScores.agentReadiness
-      } : evidence ? {
+      } : {
         accessibility: evidence.accessibility.score,
         trust: evidence.security.score,
         uxPerf: evidence.performance.score,
         agentReadiness: evidence.agentReadiness.score
-      } : {
-        accessibility: 0,
-        trust: 0,
-        uxPerf: 0,
-        agentReadiness: 0
       };
       
       overallScore = calculateOverallScore(pillarScoresNumeric);
@@ -528,16 +361,11 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
       gradeExplanation = getGradeExplanation(grade, overallScore);
       
       // Create fallback analysis with structure matching GeminiAnalysisResult
-      const scores = isMultiPage ? (scanResult as any).aggregateScores : evidence ? {
+      const scores = isMultiPage ? (scanResult as any).aggregateScores : {
         accessibility: evidence.accessibility.score,
         security: evidence.security.score,
         performance: evidence.performance.score,
         agentReadiness: evidence.agentReadiness.score
-      } : {
-        accessibility: 0,
-        security: 0,
-        performance: 0,
-        agentReadiness: 0
       };
       
       const pillarScores = {
@@ -554,18 +382,12 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
         criticalCount: (scanResult as any).siteWideSummary?.criticalIssues || 0,
         automationPotential: 75,
         actions: []
-      } : evidence ? generateAgentActionBlueprint(
+      } : generateAgentActionBlueprint(
         evidence.accessibility,
         evidence.performance,
         evidence.security,
         evidence.agentReadiness
-      ) : {
-        totalActions: 0,
-        summary: "Unable to generate blueprint",
-        criticalCount: 0,
-        automationPotential: 0,
-        actions: []
-      };
+      );
       
       geminiAnalysis = {
         overallScore,
@@ -592,7 +414,7 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
           criticalIssues: isMultiPage ? 
             ((scanResult as any).siteWideSummary?.criticalIssues > 0 ? 
               [`${(scanResult as any).siteWideSummary?.criticalIssues} critical issues found across site`] : []) :
-            (evidence?.accessibility?.criticalViolations && evidence.accessibility.criticalViolations > 0 ? 
+            (evidence.accessibility.criticalViolations > 0 ? 
               [`${evidence.accessibility.criticalViolations} critical accessibility violations found`] : []),
           deadline: "June 28, 2025",
           recommendations: ["Review accessibility scan results for EAA compliance"]
@@ -611,7 +433,6 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
     }
 
     // Create scan report with visual insights
-    console.log('Creating scan report...');
     await storage.createScanReport({
       scanId,
       overallScore,
@@ -625,22 +446,13 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
         visualInsights: visualAnalysis
       }
     });
-    console.log('Scan report created');
 
     // Mark scan as completed
-    console.log('Updating scan status to completed...');
     await storage.updateScanStatus(scanId, "completed", new Date());
-    console.log(`Scan ${scanId} marked as completed successfully`);
 
   } catch (error) {
     console.error(`Scan processing failed for ${scanId}:`, error);
-    // Clear timeout on error
-    if (timeoutId!) {
-      clearTimeout(timeoutId);
-    }
     await storage.updateScanStatus(scanId, "failed");
-    // Clear progress tracking  
-    scanProgress.delete(scanId);
     throw error;
   }
 }
