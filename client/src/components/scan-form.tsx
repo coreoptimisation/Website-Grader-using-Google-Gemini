@@ -106,10 +106,23 @@ export default function ScanForm({ onScanStarted }: ScanFormProps) {
               />
               <Label 
                 htmlFor="single-scan" 
-                className="flex flex-col p-4 border-2 rounded-lg cursor-pointer hover:bg-slate-50 peer-checked:border-blue-600 peer-checked:bg-blue-50"
+                className={`flex flex-col p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                  form.watch("scanType") === "single" 
+                    ? "border-blue-600 bg-blue-50 ring-2 ring-blue-600 ring-offset-2" 
+                    : "border-gray-200 hover:bg-slate-50"
+                }`}
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center space-x-2">
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                      form.watch("scanType") === "single" 
+                        ? "border-blue-600 bg-blue-600" 
+                        : "border-gray-400"
+                    }`}>
+                      {form.watch("scanType") === "single" && (
+                        <div className="w-2 h-2 rounded-full bg-white" />
+                      )}
+                    </div>
                     <Zap className="w-5 h-5 text-blue-600" />
                     <span className="font-semibold text-slate-900">Quick Scan</span>
                   </div>
@@ -135,10 +148,23 @@ export default function ScanForm({ onScanStarted }: ScanFormProps) {
               />
               <Label 
                 htmlFor="multi-scan" 
-                className="flex flex-col p-4 border-2 rounded-lg cursor-pointer hover:bg-slate-50 peer-checked:border-blue-600 peer-checked:bg-blue-50"
+                className={`flex flex-col p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                  form.watch("scanType") === "multi" 
+                    ? "border-blue-600 bg-blue-50 ring-2 ring-blue-600 ring-offset-2" 
+                    : "border-gray-200 hover:bg-slate-50"
+                }`}
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center space-x-2">
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                      form.watch("scanType") === "multi" 
+                        ? "border-blue-600 bg-blue-600" 
+                        : "border-gray-400"
+                    }`}>
+                      {form.watch("scanType") === "multi" && (
+                        <div className="w-2 h-2 rounded-full bg-white" />
+                      )}
+                    </div>
                     <Layers className="w-5 h-5 text-blue-600" />
                     <span className="font-semibold text-slate-900">Deep Analysis</span>
                     <TooltipProvider>
