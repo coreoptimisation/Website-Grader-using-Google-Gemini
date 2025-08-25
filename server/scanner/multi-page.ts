@@ -171,7 +171,7 @@ export async function runMultiPageScan(
   }
   
   // Step 3: Calculate aggregate scores
-  updateProgress(scanId, 'finalizing', maxPagesToScan + 1, maxPagesToScan, 'Calculating scores and generating AI insights...');
+  updateProgress(scanId, 'finalizing', maxPagesToScan + 1, maxPagesToScan, 'Finishing analysis and compiling final report...');
   const aggregateScores = calculateAggregateScores(pageResults);
   
   // Step 4: Generate ecommerce summary if applicable
