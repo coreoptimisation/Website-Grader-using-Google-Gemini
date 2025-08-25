@@ -41,9 +41,9 @@ function getScoreColor(score: number): string {
 }
 
 function getProgressColor(score: number): string {
-  if (score >= 80) return "bg-success";
-  if (score >= 60) return "bg-warning";
-  return "bg-danger";
+  if (score >= 80) return "bg-green-500";
+  if (score >= 60) return "bg-yellow-500";
+  return "bg-red-500";
 }
 
 function getScoreDescription(score: number): string {
