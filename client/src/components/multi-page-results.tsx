@@ -56,6 +56,23 @@ export function MultiPageResults({ data, evidence, scanId, onPageViewChange }: M
 
   return (
     <div className="space-y-6">
+      {/* Website Header */}
+      <div className="text-center space-y-2 mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Website Analysis Report</h1>
+        <div className="flex items-center justify-center gap-2 text-lg sm:text-xl text-blue-600">
+          <Globe className="h-5 w-5" />
+          <span className="font-semibold break-all">{data.primaryUrl}</span>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="p-1 h-auto"
+            onClick={() => window.open(data.primaryUrl, '_blank')}
+          >
+            <ExternalLink className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
       {/* Multi-Page Analysis Header */}
       <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
         <CardHeader className="p-4 sm:p-6">
