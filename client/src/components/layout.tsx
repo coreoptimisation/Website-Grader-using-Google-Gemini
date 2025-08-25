@@ -91,7 +91,6 @@ export default function Layout({ children }: LayoutProps) {
                 <Plus className="w-4 h-4 sm:mr-2 inline" />
                 <span className="hidden sm:inline">New Scan</span>
               </button>
-              <div className="w-8 h-8 bg-slate-300 rounded-full" data-testid="user-avatar"></div>
             </div>
           </div>
         </header>
