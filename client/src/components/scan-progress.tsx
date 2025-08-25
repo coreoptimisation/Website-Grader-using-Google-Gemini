@@ -23,6 +23,7 @@ export default function ScanProgress({ scanId, url, status }: ScanProgressProps)
   });
   
   const progress = (scanData as any)?.progress;
+  const discoveredPages = progress?.discoveredPages || [];
   
   // Update elapsed time
   useEffect(() => {
@@ -42,12 +43,33 @@ export default function ScanProgress({ scanId, url, status }: ScanProgressProps)
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
   
+  // Helper to extract page name from URL
+  const getPageName = (pageUrl: string) => {
+    if (!pageUrl) return 'Page';
+    
+    // Remove protocol and www
+    const cleanUrl = pageUrl.replace(/^https?:\/\/(www\.)?/, '');
+    
+    // Extract path
+    const parts = cleanUrl.split('/');
+    const domain = parts[0];
+    const path = parts.slice(1).join('/');
+    
+    // Return shortened version
+    if (!path || path === '') return domain;
+    
+    // Truncate long paths
+    const shortPath = path.length > 30 ? path.substring(0, 30) + '...' : path;
+    return `${domain}/${shortPath}`;
+  };
+  
   // Use real progress or default values
   const currentStage = progress?.stage || 'initializing';
   const currentPage = progress?.currentPage || 0;
   const totalPages = progress?.totalPages || 4;
   const message = progress?.message || 'Starting scan...';
   const percentage = progress?.percentage || 0;
+  const currentPageUrl = progress?.pageUrl;
   
   // Estimate remaining time based on progress
   const estimatedTotal = percentage > 0 ? (elapsedTime / percentage) * 100 : 360;
@@ -102,9 +124,12 @@ export default function ScanProgress({ scanId, url, status }: ScanProgressProps)
             <div className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center">
               <Loader2 className="w-4 h-4 animate-spin" />
             </div>
-            <div>
-              <p className="font-semibold text-slate-900 capitalize">
+            <div className="flex-1">
+              <p className="font-semibold text-slate-900">
                 {currentStage === 'crawling' ? 'Discovering Pages' : 
+                 currentStage === 'scanning' && currentPageUrl ? 
+                   (currentPageUrl.includes(url?.replace(/^https?:\/\/(www\.)?/, '').split('/')[0] || '') && 
+                    currentPageUrl.split('/').length <= 4 ? 'Homepage' : getPageName(currentPageUrl)) :
                  currentStage === 'scanning' ? `Analyzing Page ${currentPage} of ${totalPages}` :
                  currentStage === 'finalizing' ? 'Generating Report' :
                  'Processing...'}
@@ -122,10 +147,10 @@ export default function ScanProgress({ scanId, url, status }: ScanProgressProps)
         </div>
       </div>
       
-      {/* Stage Progress Indicators */}
+      {/* Stage Progress Indicators - Show actual discovered pages */}
       <div className="space-y-3">
         <h4 className="text-sm font-semibold text-slate-700">Analysis Pipeline</h4>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {/* Crawling Stage */}
           <div className={`p-3 rounded-lg border ${
             currentStage === 'crawling' ? 'border-blue-500 bg-blue-50' :
@@ -144,30 +169,59 @@ export default function ScanProgress({ scanId, url, status }: ScanProgressProps)
             </div>
           </div>
           
-          {/* Page Scanning Stages */}
-          {[1, 2, 3, 4].map((pageNum) => (
-            <div key={pageNum} className={`p-3 rounded-lg border ${
-              currentStage === 'scanning' && currentPage === pageNum ? 'border-blue-500 bg-blue-50' :
-              currentPage > pageNum || currentStage === 'finalizing' ? 'border-green-500 bg-green-50' :
-              'border-slate-200 bg-white'
-            }`}>
-              <div className="flex items-center gap-2">
-                {currentStage === 'scanning' && currentPage === pageNum ? (
-                  <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
-                ) : currentPage > pageNum || currentStage === 'finalizing' ? (
-                  <Check className="w-4 h-4 text-green-500" />
-                ) : (
-                  <Clock className="w-4 h-4 text-slate-400" />
-                )}
-                <span className="text-sm font-medium">
-                  {pageNum === 1 ? 'Homepage' :
-                   pageNum === 2 ? 'Shop/Product' :
-                   pageNum === 3 ? 'Booking/Cart' :
-                   'Content Page'}
-                </span>
+          {/* Page Scanning Stages - Use actual discovered pages or placeholders */}
+          {discoveredPages.length > 0 ? (
+            // Show actual discovered pages
+            discoveredPages.map((pageUrl: string, index: number) => {
+              const pageNum = index + 1;
+              const isHomepage = pageUrl.includes(url?.replace(/^https?:\/\/(www\.)?/, '').split('/')[0] || '') && 
+                               pageUrl.split('/').length <= 4;
+              const pageName = isHomepage ? 'Homepage' : getPageName(pageUrl);
+              
+              return (
+                <div key={pageNum} className={`p-3 rounded-lg border ${
+                  currentStage === 'scanning' && currentPage === pageNum ? 'border-blue-500 bg-blue-50' :
+                  currentPage > pageNum || currentStage === 'finalizing' ? 'border-green-500 bg-green-50' :
+                  'border-slate-200 bg-white'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    {currentStage === 'scanning' && currentPage === pageNum ? (
+                      <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+                    ) : currentPage > pageNum || currentStage === 'finalizing' ? (
+                      <Check className="w-4 h-4 text-green-500" />
+                    ) : (
+                      <Clock className="w-4 h-4 text-slate-400" />
+                    )}
+                    <span className="text-sm font-medium truncate" title={pageUrl}>
+                      {pageNum}. {pageName}
+                    </span>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            // Show placeholder pages during discovery
+            [1, 2, 3, 4].map((pageNum) => (
+              <div key={pageNum} className={`p-3 rounded-lg border ${
+                currentStage === 'scanning' && currentPage === pageNum ? 'border-blue-500 bg-blue-50' :
+                currentPage > pageNum || currentStage === 'finalizing' ? 'border-green-500 bg-green-50' :
+                'border-slate-200 bg-white'
+              }`}>
+                <div className="flex items-center gap-2">
+                  {currentStage === 'scanning' && currentPage === pageNum ? (
+                    <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+                  ) : currentPage > pageNum || currentStage === 'finalizing' ? (
+                    <Check className="w-4 h-4 text-green-500" />
+                  ) : (
+                    <Clock className="w-4 h-4 text-slate-400" />
+                  )}
+                  <span className="text-sm font-medium">
+                    {pageNum}. {pageNum === 1 ? 'Discovering...' : `Page ${pageNum}`}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
           
           {/* Finalizing Stage */}
           <div className={`p-3 rounded-lg border ${

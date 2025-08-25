@@ -97,6 +97,11 @@ export async function runMultiPageScan(
   });
   console.log(`Found ecommerce pages:`, crawlResult.ecommercePages);
   
+  // Store discovered pages in progress
+  if ((global as any).scanProgress?.[scanId]) {
+    (global as any).scanProgress[scanId].discoveredPages = crawlResult.urls.slice(0, 4);
+  }
+  
   // Step 2: Scan each critical page (exactly 4 pages)
   const pageResults: PageScanResult[] = [];
   const maxPagesToScan = Math.min(crawlResult.urls.length, 4); // Focus on 4 critical pages: homepage, shop, booking, detail
