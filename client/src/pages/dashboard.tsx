@@ -159,19 +159,6 @@ export default function Dashboard() {
             <li>
               <button
                 onClick={() => {
-                  setCurrentView('dashboard');
-                  setIsSidebarOpen(false);
-                }}
-                className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100"
-                data-testid="nav-new-scan"
-              >
-                <Plus className="w-5 h-5" />
-                <span>New Scan</span>
-              </button>
-            </li>
-            <li>
-              <button
-                onClick={() => {
                   setCurrentView('history');
                   setIsSidebarOpen(false);
                 }}
