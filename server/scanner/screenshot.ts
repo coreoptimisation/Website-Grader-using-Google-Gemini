@@ -2,7 +2,6 @@ import { chromium } from "playwright";
 import { mkdir, writeFile } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
-import { getBrowserLaunchOptions } from './browser-utils';
 
 export interface ScreenshotResult {
   success: boolean;
@@ -16,8 +15,10 @@ export interface ScreenshotResult {
 }
 
 export async function captureScreenshot(url: string, scanId: string): Promise<ScreenshotResult> {
-  const launchOptions = getBrowserLaunchOptions();
-  const browser = await chromium.launch(launchOptions);
+  const browser = await chromium.launch({ 
+    headless: true,
+    executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium'
+  });
   
   try {
     const context = await browser.newContext({
@@ -96,8 +97,7 @@ export async function captureElementScreenshot(
 ): Promise<ScreenshotResult> {
   const browser = await chromium.launch({ 
     headless: true,
-    executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+    executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium'
   });
   
   try {

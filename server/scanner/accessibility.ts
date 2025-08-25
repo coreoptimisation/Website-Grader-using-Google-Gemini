@@ -1,6 +1,5 @@
 import { chromium } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
-import { getBrowserLaunchOptions } from './browser-utils';
 
 export interface AccessibilityResult {
   score: number;
@@ -15,30 +14,10 @@ export interface AccessibilityResult {
 }
 
 export async function runAccessibilityAudit(url: string): Promise<AccessibilityResult> {
-  console.log(`[ACCESSIBILITY] Starting audit for ${url}`);
-  console.log(`[ACCESSIBILITY] Environment: ${process.env.NODE_ENV || 'unknown'}`);
-  
-  let browser;
-  try {
-    console.log(`[ACCESSIBILITY] Attempting to launch browser...`);
-    const launchOptions = getBrowserLaunchOptions();
-    browser = await chromium.launch(launchOptions);
-    console.log(`[ACCESSIBILITY] Browser launched successfully`);
-  } catch (launchError) {
-    console.error('[ACCESSIBILITY] Browser launch failed:', launchError);
-    // Return fallback scores
-    return {
-      score: 0,
-      violations: [],
-      passes: [],
-      incomplete: [],
-      wcagLevel: "Failed",
-      totalViolations: 0,
-      criticalViolations: 0,
-      moderateViolations: 0,
-      minorViolations: 0
-    };
-  }
+  const browser = await chromium.launch({ 
+    headless: true,
+    executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium'
+  });
   
   try {
     const context = await browser.newContext();

@@ -21,64 +21,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
-  // Diagnostic endpoint for testing browser
-  app.get("/api/diagnostics", async (req, res) => {
-    const fs = await import('fs');
-    const { chromium } = await import('playwright');
-    
-    const results = {
-      environment: process.env.NODE_ENV || 'unknown',
-      platform: process.platform,
-      nodeVersion: process.version,
-      chromiumPath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
-      pathExists: false,
-      browserTest: false,
-      geminiKeySet: !!process.env.GEMINI_API_KEY,
-      databaseUrlSet: !!process.env.DATABASE_URL,
-      error: null as string | null
-    };
-    
-    // Check if chromium path exists
-    results.pathExists = fs.existsSync(results.chromiumPath);
-    
-    // Try to launch browser
-    try {
-      const browser = await chromium.launch({
-        headless: true,
-        executablePath: results.chromiumPath,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
-      });
-      await browser.close();
-      results.browserTest = true;
-    } catch (error: any) {
-      results.error = error.message;
-    }
-    
-    res.json(results);
-  });
-
-  // Test scan endpoint - lightweight scan for testing
-  app.post("/api/test-scan", async (req, res) => {
-    const { url = 'https://example.com' } = req.body;
-    
-    try {
-      const { runAccessibilityAudit } = await import('./scanner/accessibility');
-      const result = await runAccessibilityAudit(url);
-      res.json({ 
-        success: true, 
-        url,
-        accessibilityScore: result.score,
-        violations: result.totalViolations
-      });
-    } catch (error: any) {
-      res.json({ 
-        success: false, 
-        error: error.message,
-        stack: error.stack
-      });
-    }
-  });
-
   // Start a new scan
   app.post("/api/scans", async (req, res) => {
     try {
@@ -169,39 +111,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 }
 
 async function processScan(scanId: string, url: string, multiPage: boolean = true) {
-  console.log(`[SCAN] Starting scan ${scanId} for ${url}`);
-  console.log(`[SCAN] Environment: ${process.env.NODE_ENV}`);
-  console.log(`[SCAN] Multi-page: ${multiPage}`);
-  
   try {
     // Update status to scanning
     await storage.updateScanStatus(scanId, "scanning");
-    console.log(`[SCAN] Status updated to scanning`);
     
     // Run complete scan with screenshot capture
-    console.log(`[SCAN] Running complete scan...`);
     const scanResult = await runCompleteScan(url, scanId, multiPage);
     
-    // Check if all scanners failed (indicates domain/connectivity issues)
+    // Check if it's a multi-page scan result
     const isMultiPage = 'pageResults' in scanResult;
-    if (isMultiPage) {
-      const multiPageResult = scanResult as any;
-      const hasAnySuccessfulScans = multiPageResult.pageResults?.some((page: any) => 
-        page.accessibility?.score > 0 || page.performance?.score > 0 || 
-        page.security?.score > 0 || page.agentReadiness?.score > 0
-      );
-      if (!hasAnySuccessfulScans) {
-        throw new Error(`Failed to access website: ${url}. Please check the URL and try again.`);
-      }
-    } else {
-      const evidence = scanResult as any;
-      if ((!evidence.accessibility || evidence.accessibility.error) &&
-          (!evidence.performance || evidence.performance.error) &&
-          (!evidence.security || evidence.security.error) &&
-          (!evidence.agentReadiness || evidence.agentReadiness.error)) {
-        throw new Error(`Failed to access website: ${url}. Please check the URL and try again.`);
-      }
-    }
     
     // For single-page scan, use the result as evidence
     const evidence = isMultiPage ? null : scanResult;
@@ -280,44 +198,36 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
           recommendations: []
         }
       ];
-    } else if (evidence) {
+    } else {
       pillarResults = [
         {
           scanId,
           pillar: "accessibility",
-          score: evidence.accessibility?.score || 0,
-          rawData: evidence.accessibility || {},
+          score: evidence.accessibility.score,
+          rawData: evidence.accessibility,
           recommendations: []
         },
         {
           scanId,
           pillar: "performance",
-          score: evidence.performance?.score || 0,
-          rawData: evidence.performance || {},
+          score: evidence.performance.score,
+          rawData: evidence.performance,
           recommendations: []
         },
         {
           scanId,
           pillar: "trust",
-          score: evidence.security?.score || 0,
-          rawData: evidence.security || {},
+          score: evidence.security.score,
+          rawData: evidence.security,
           recommendations: []
         },
         {
           scanId,
           pillar: "agentReadiness",
-          score: evidence.agentReadiness?.score || 0,
-          rawData: evidence.agentReadiness || {},
+          score: evidence.agentReadiness.score,
+          rawData: evidence.agentReadiness,
           recommendations: []
         }
-      ];
-    } else {
-      // Fallback if no evidence
-      pillarResults = [
-        { scanId, pillar: "accessibility", score: 0, rawData: {}, recommendations: [] },
-        { scanId, pillar: "performance", score: 0, rawData: {}, recommendations: [] },
-        { scanId, pillar: "trust", score: 0, rawData: {}, recommendations: [] },
-        { scanId, pillar: "agentReadiness", score: 0, rawData: {}, recommendations: [] }
       ];
     }
 
@@ -372,7 +282,7 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
         if (multiPageResult.pageResults?.[0]?.screenshot?.success) {
           screenshotPath = multiPageResult.pageResults[0].screenshot.filePath;
         }
-      } else if (evidence) {
+      } else {
         // Single-page scan
         if (evidence.screenshot?.success && evidence.screenshot?.filePath) {
           screenshotPath = evidence.screenshot.filePath;
@@ -380,11 +290,13 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
         
         // Send summarized data to reduce API token usage and avoid quota limits
         summarizedEvidence = {
-          url: evidence.url || url,
+          url: evidence.url,
+          multiPage: false,
+          pagesAnalyzed: 1,
           accessibility: {
-            score: evidence.accessibility?.score || 0,
-            violations: evidence.accessibility?.violations?.length || 0,
-            criticalViolations: evidence.accessibility?.criticalViolations || 0,
+            score: evidence.accessibility.score,
+            violations: evidence.accessibility.violations?.length || 0,
+            criticalViolations: evidence.accessibility.criticalViolations || 0,
             topIssues: evidence.accessibility.violations?.slice(0, 3).map((v: any) => ({
               id: v.id,
               impact: v.impact,
@@ -392,23 +304,23 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
             })) || []
           },
           performance: {
-            score: evidence.performance?.score || 0,
-            fcp: evidence.performance?.coreWebVitals?.fcp,
-            lcp: evidence.performance?.coreWebVitals?.lcp,
-            opportunities: evidence.performance?.opportunities?.slice(0, 3).map((o: any) => ({
+            score: evidence.performance.score,
+            fcp: evidence.performance.coreWebVitals?.fcp,
+            lcp: evidence.performance.coreWebVitals?.lcp,
+            opportunities: evidence.performance.opportunities?.slice(0, 3).map((o: any) => ({
               title: o.title,
               numericValue: o.numericValue
             })) || []
           },
           security: {
-            score: evidence.security?.score || 0,
-            https: evidence.security?.https || false,
-            vulnerabilities: evidence.security?.vulnerabilities?.slice(0, 3) || []
+            score: evidence.security.score,
+            https: evidence.security.https,
+            vulnerabilities: evidence.security.vulnerabilities?.slice(0, 3) || []
           },
           agentReadiness: {
-            score: evidence.agentReadiness?.score || 0,
-            robots: evidence.agentReadiness?.robots?.found || false,
-            sitemaps: evidence.agentReadiness?.sitemaps?.found || false
+            score: evidence.agentReadiness.score,
+            robots: evidence.agentReadiness.robots?.found || false,
+            sitemaps: evidence.agentReadiness.sitemaps?.found || false
           }
         };
       }
@@ -438,10 +350,10 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
         uxPerf: (scanResult as any).aggregateScores.performance,
         agentReadiness: (scanResult as any).aggregateScores.agentReadiness
       } : {
-        accessibility: evidence?.accessibility?.score || 0,
-        trust: evidence?.security?.score || 0,
-        uxPerf: evidence?.performance?.score || 0,
-        agentReadiness: evidence?.agentReadiness?.score || 0
+        accessibility: evidence.accessibility.score,
+        trust: evidence.security.score,
+        uxPerf: evidence.performance.score,
+        agentReadiness: evidence.agentReadiness.score
       };
       
       overallScore = calculateOverallScore(pillarScoresNumeric);
@@ -450,10 +362,10 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
       
       // Create fallback analysis with structure matching GeminiAnalysisResult
       const scores = isMultiPage ? (scanResult as any).aggregateScores : {
-        accessibility: evidence?.accessibility?.score || 0,
-        security: evidence?.security?.score || 0,
-        performance: evidence?.performance?.score || 0,
-        agentReadiness: evidence?.agentReadiness?.score || 0
+        accessibility: evidence.accessibility.score,
+        security: evidence.security.score,
+        performance: evidence.performance.score,
+        agentReadiness: evidence.agentReadiness.score
       };
       
       const pillarScores = {
@@ -470,12 +382,12 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
         criticalCount: (scanResult as any).siteWideSummary?.criticalIssues || 0,
         automationPotential: 75,
         actions: []
-      } : (evidence ? generateAgentActionBlueprint(
+      } : generateAgentActionBlueprint(
         evidence.accessibility,
         evidence.performance,
         evidence.security,
         evidence.agentReadiness
-      ) : { totalActions: 0, summary: "No data available", criticalCount: 0, automationPotential: 0, actions: [] });
+      );
       
       geminiAnalysis = {
         overallScore,
@@ -502,8 +414,8 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
           criticalIssues: isMultiPage ? 
             ((scanResult as any).siteWideSummary?.criticalIssues > 0 ? 
               [`${(scanResult as any).siteWideSummary?.criticalIssues} critical issues found across site`] : []) :
-            ((evidence?.accessibility?.criticalViolations || 0) > 0 ? 
-              [`${evidence?.accessibility?.criticalViolations || 0} critical accessibility violations found`] : []),
+            (evidence.accessibility.criticalViolations > 0 ? 
+              [`${evidence.accessibility.criticalViolations} critical accessibility violations found`] : []),
           deadline: "June 28, 2025",
           recommendations: ["Review accessibility scan results for EAA compliance"]
         },

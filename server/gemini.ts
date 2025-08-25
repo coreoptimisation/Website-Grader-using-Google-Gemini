@@ -4,13 +4,7 @@ import { calculateOverallScore, getGrade, getGradeExplanation, calculateTopFixes
 import * as fs from "fs";
 import * as path from "path";
 
-// Check if API key is available
-const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY || "";
-if (!apiKey) {
-  console.error("WARNING: GEMINI_API_KEY is not set. AI analysis will be limited.");
-}
-
-const genAI = new GoogleGenerativeAI(apiKey);
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY || "");
 
 // Using gemini-2.0-flash-thinking-exp-1219 - latest model with thinking capabilities
 // Alternatives: gemini-2.0-flash-exp, gemini-exp-1206
@@ -194,38 +188,6 @@ For EAA compliance (European Accessibility Act - deadline June 28, 2025), map WC
     evidence.agentReadiness
   );
 
-  // Check if API key is configured
-  if (!apiKey) {
-    console.error("Skipping Gemini AI analysis - GEMINI_API_KEY not configured");
-    // Return fallback analysis without AI
-    const overallScore = calculateOverallScore({
-      accessibility: evidence.accessibility?.score || 0,
-      trust: evidence.security?.score || 0,
-      uxPerf: evidence.performance?.score || 0,
-      agentReadiness: evidence.agentReadiness?.score || 0
-    } as PillarScores);
-    
-    return {
-      summary: "Basic analysis completed (AI analysis unavailable - API key not configured)",
-      topFixes: calculateTopFixes({
-        accessibility: evidence.accessibility?.score || 0,
-        trust: evidence.security?.score || 0,
-        uxPerf: evidence.performance?.score || 0,
-        agentReadiness: evidence.agentReadiness?.score || 0
-      } as PillarScores, evidence),
-      pillarScores: {
-        accessibility: evidence.accessibility?.score || 0,
-        trust: evidence.security?.score || 0,
-        uxPerf: evidence.performance?.score || 0,
-        agentReadiness: evidence.agentReadiness?.score || 0
-      },
-      recommendations: [],
-      overallGrade: getGrade(overallScore),
-      gradeExplanation: getGradeExplanation(overallScore),
-      agentActionBlueprint: agentBlueprint
-    } as any;
-  }
-  
   try {
     const result = await model.generateContent({ contents: [{ role: "user", parts: [{ text: prompt }] }] });
     const responseText = result.response.text();
@@ -300,32 +262,6 @@ For EAA compliance (European Accessibility Act - deadline June 28, 2025), map WC
     }
   } catch (error) {
     console.error("Gemini analysis failed:", error);
-    // Return basic scores instead of throwing error
-    const overallScore = calculateOverallScore({
-      accessibility: evidence.accessibility?.score || 0,
-      trust: evidence.security?.score || 0,
-      uxPerf: evidence.performance?.score || 0,
-      agentReadiness: evidence.agentReadiness?.score || 0
-    } as PillarScores);
-    
-    return {
-      summary: "Basic analysis completed (AI insights unavailable due to error)",
-      topFixes: calculateTopFixes({
-        accessibility: evidence.accessibility?.score || 0,
-        trust: evidence.security?.score || 0,
-        uxPerf: evidence.performance?.score || 0,
-        agentReadiness: evidence.agentReadiness?.score || 0
-      } as PillarScores, evidence),
-      pillarScores: {
-        accessibility: evidence.accessibility?.score || 0,
-        trust: evidence.security?.score || 0,
-        uxPerf: evidence.performance?.score || 0,
-        agentReadiness: evidence.agentReadiness?.score || 0
-      },
-      recommendations: [],
-      overallGrade: getGrade(overallScore),
-      gradeExplanation: getGradeExplanation(overallScore),
-      agentActionBlueprint: agentBlueprint
-    } as any;
+    throw new Error(`Failed to analyze website findings: ${error}`);
   }
 }
