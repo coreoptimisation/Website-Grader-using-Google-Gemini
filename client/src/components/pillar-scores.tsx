@@ -85,10 +85,10 @@ export default function PillarScores({ results }: PillarScoresProps) {
               <div className={`text-2xl sm:text-3xl font-bold mb-2 ${getScoreColor(score)}`} data-testid={`score-${key}`}>
                 {score}
               </div>
-              <div className="w-full bg-slate-200 rounded-full h-2 mb-2">
+              <div className="w-full bg-slate-200 rounded-full h-3 mb-2">
                 <div 
-                  className={`h-2 rounded-full ${getProgressColor(score)}`} 
-                  style={{ width: `${score}%` }}
+                  className={`h-3 rounded-full transition-all duration-500 ${getProgressColor(score)}`} 
+                  style={{ width: `${Math.max(0, Math.min(100, score))}%` }}
                 ></div>
               </div>
               <p className="text-xs sm:text-sm text-slate-600">{getScoreDescription(score)}</p>
