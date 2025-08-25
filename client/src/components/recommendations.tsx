@@ -118,64 +118,24 @@ export default function Recommendations({ report }: RecommendationsProps) {
         allowTaint: true
       });
       
-      // Create PDF with proper pagination
+      // Create PDF
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       
+      // Calculate dimensions to fit page
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
-      const margin = 15;
-      const headerHeight = 25;
-      const availableHeight = pdfHeight - headerHeight - margin;
-      const availableWidth = pdfWidth - 2 * margin;
-      
-      // Calculate scaling to fit width properly
       const imgWidth = canvas.width;
       const imgHeight = canvas.height;
-      const widthRatio = availableWidth / imgWidth;
-      const scaledHeight = imgHeight * widthRatio;
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+      const imgX = (pdfWidth - imgWidth * ratio) / 2;
+      const imgY = 30;
       
-      // Add header to first page
-      pdf.setFontSize(16);
-      pdf.text('Website Analysis Report', pdfWidth / 2, 15, { align: 'center' });
+      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
       
-      // Calculate how many pages we need
-      const totalPages = Math.ceil(scaledHeight / availableHeight);
-      
-      // Split the image across multiple pages
-      let currentY = 0;
-      
-      for (let pageNum = 0; pageNum < totalPages; pageNum++) {
-        if (pageNum > 0) {
-          pdf.addPage();
-          pdf.setFontSize(16);
-          pdf.text(`Website Analysis Report (Page ${pageNum + 1})`, pdfWidth / 2, 15, { align: 'center' });
-        }
-        
-        // Calculate how much of the image fits on this page
-        const remainingHeight = scaledHeight - currentY;
-        const pageImageHeight = Math.min(availableHeight, remainingHeight);
-        
-        // Convert back to original image coordinates
-        const sourceY = currentY / widthRatio;
-        const sourceHeight = pageImageHeight / widthRatio;
-        
-        // Add the image section to this page
-        pdf.addImage(
-          imgData, 
-          'PNG', 
-          margin, 
-          headerHeight, 
-          availableWidth, 
-          pageImageHeight,
-          undefined,
-          'FAST',
-          0,
-          -sourceY
-        );
-        
-        currentY += pageImageHeight;
-      }
+      // Add header
+      pdf.setFontSize(20);
+      pdf.text('Website Analysis Report', pdfWidth / 2, 20, { align: 'center' });
       
       // Save PDF
       const date = new Date().toLocaleDateString().replace(/\//g, '-');
