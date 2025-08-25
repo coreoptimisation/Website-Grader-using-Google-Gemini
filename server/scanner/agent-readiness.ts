@@ -1,4 +1,4 @@
-import { chromium } from "playwright";
+import { launchPlaywrightBrowser } from "./browser-launcher";
 import * as xml2js from "xml2js";
 
 export interface AgentReadinessResult {
@@ -41,13 +41,7 @@ export interface AgentReadinessResult {
 }
 
 export async function runAgentReadinessAudit(url: string): Promise<AgentReadinessResult> {
-  const browser = await chromium.launch({ 
-    headless: true,
-    // Only use specific executable path in development
-    ...(process.env.NODE_ENV === 'development' && {
-      executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium'
-    })
-  });
+  const browser = await launchPlaywrightBrowser();
   const baseUrl = new URL(url).origin;
   
   try {

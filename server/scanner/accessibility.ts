@@ -1,5 +1,5 @@
-import { chromium } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
+import { launchPlaywrightBrowser } from "./browser-launcher";
 
 export interface AccessibilityResult {
   score: number;
@@ -14,13 +14,7 @@ export interface AccessibilityResult {
 }
 
 export async function runAccessibilityAudit(url: string): Promise<AccessibilityResult> {
-  const browser = await chromium.launch({ 
-    headless: true,
-    // Only use specific executable path in development
-    ...(process.env.NODE_ENV === 'development' && {
-      executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium'
-    })
-  });
+  const browser = await launchPlaywrightBrowser();
   
   try {
     const context = await browser.newContext();

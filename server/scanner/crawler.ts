@@ -1,4 +1,5 @@
-import { chromium, Browser, Page } from "playwright";
+import { Browser, Page } from "playwright";
+import { launchPlaywrightBrowser } from "./browser-launcher";
 import robotsParser from "robots-parser";
 import * as xml2js from "xml2js";
 
@@ -32,13 +33,7 @@ export class WebCrawler {
       this.domain = url.origin;
       
       // Launch browser
-      this.browser = await chromium.launch({ 
-        headless: true,
-        // Only use specific executable path in development
-        ...(process.env.NODE_ENV === 'development' && {
-          executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium'
-        })
-      });
+      this.browser = await launchPlaywrightBrowser();
       
       const result: CrawlResult = {
         urls: [],

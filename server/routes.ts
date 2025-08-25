@@ -7,6 +7,7 @@ import { analyzeScreenshot } from "./gemini-visual";
 import { z } from "zod";
 import { calculateOverallScore, getGrade, getGradeExplanation } from "../shared/scoring";
 import { generateAgentActionBlueprint } from "./scanner/agent-blueprint";
+import { checkBrowserHealth } from "./scanner/browser-launcher";
 
 const scanRequestSchema = z.object({
   url: z.string().url("Invalid URL format"),
@@ -21,9 +22,23 @@ if (!(global as any).scanProgress) {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
-  // Health check
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  // Health check with browser availability
+  app.get("/api/health", async (req, res) => {
+    try {
+      const browserHealthy = await checkBrowserHealth();
+      res.json({ 
+        status: browserHealthy ? "ok" : "degraded",
+        browser: browserHealthy ? "available" : "unavailable",
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      res.status(503).json({ 
+        status: "error", 
+        browser: "unavailable",
+        message: "Browser health check failed",
+        timestamp: new Date().toISOString()
+      });
+    }
   });
 
   // Start a new scan

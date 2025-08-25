@@ -1,4 +1,4 @@
-import { chromium } from "playwright";
+import { launchPlaywrightBrowser } from "./browser-launcher";
 import { mkdir, writeFile } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
@@ -15,13 +15,7 @@ export interface ScreenshotResult {
 }
 
 export async function captureScreenshot(url: string, scanId: string): Promise<ScreenshotResult> {
-  const browser = await chromium.launch({ 
-    headless: true,
-    // Only use specific executable path in development
-    ...(process.env.NODE_ENV === 'development' && {
-      executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium'
-    })
-  });
+  const browser = await launchPlaywrightBrowser();
   
   try {
     const context = await browser.newContext({
@@ -98,13 +92,7 @@ export async function captureElementScreenshot(
   selector: string, 
   scanId: string
 ): Promise<ScreenshotResult> {
-  const browser = await chromium.launch({ 
-    headless: true,
-    // Only use specific executable path in development
-    ...(process.env.NODE_ENV === 'development' && {
-      executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium'
-    })
-  });
+  const browser = await launchPlaywrightBrowser();
   
   try {
     const context = await browser.newContext({

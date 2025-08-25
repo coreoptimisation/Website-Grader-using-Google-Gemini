@@ -215,14 +215,8 @@ async function detectBookingSystem(url: string, homepageUrl?: string): Promise<B
   let page;
   
   try {
-    const { chromium } = await import('playwright');
-    browser = await chromium.launch({ 
-      headless: true,
-      // Only use specific executable path in development
-      ...(process.env.NODE_ENV === 'development' && {
-        executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium'
-      })
-    });
+    const { launchPlaywrightBrowser } = await import('./browser-launcher');
+    browser = await launchPlaywrightBrowser();
     page = await browser.newPage();
     await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
     
@@ -629,14 +623,15 @@ async function analyzeEcommercePage(
 function calculateAggregateScores(pageResults: PageScanResult[]) {
   const validResults = pageResults.filter(r => !r.accessibility.error);
   
-  if (validResults.length === 0) {
-    return {
-      accessibility: 0,
-      performance: 0,
-      security: 0,
-      agentReadiness: 0,
-      overall: 0
-    };
+  // If all pages failed to scan, throw an error instead of returning zeros
+  if (validResults.length === 0 && pageResults.length > 0) {
+    const firstError = pageResults.find(r => r.accessibility.error)?.accessibility.errorMessage;
+    throw new Error(`All page scans failed: ${firstError || 'Browser launch failure'}`);
+  }
+  
+  // If no pages were scanned at all
+  if (pageResults.length === 0) {
+    throw new Error('No pages were scanned');
   }
   
   // Weight homepage and critical pages more heavily
