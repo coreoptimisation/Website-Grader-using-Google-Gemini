@@ -92,12 +92,30 @@ export default function Recommendations({ report }: RecommendationsProps) {
     });
   }
 
+  const handleExportPDF = () => {
+    // Expand all sections for complete PDF export
+    const allPillars = Object.keys(recommendationsByPillar);
+    setExpandedSections(new Set(allPillars));
+    
+    // Expand all recommendations
+    const allRecommendations = Object.values(recommendationsByPillar).flat().map((rec: any) => rec.originalIndex);
+    setExpandedRecommendations(new Set(allRecommendations));
+    
+    // Wait for state update, then print
+    setTimeout(() => {
+      const originalTitle = document.title;
+      document.title = `Website Analysis Report - ${new Date().toLocaleDateString()}`;
+      window.print();
+      document.title = originalTitle;
+    }, 100);
+  };
+
   return (
     <Card className="p-6" data-testid="detailed-recommendations">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-slate-900">Detailed Recommendations</h3>
         <div className="flex space-x-2">
-          <Button variant="outline" size="sm" data-testid="button-export-pdf">
+          <Button variant="outline" size="sm" onClick={handleExportPDF} data-testid="button-export-pdf">
             <Download className="w-4 h-4 mr-2" />
             Export PDF
           </Button>
