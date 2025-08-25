@@ -212,7 +212,10 @@ export async function runMultiPageScan(
   const aggregateScores = calculateAggregateScores(pageResults);
   
   // Step 4: Generate ecommerce summary if applicable
-  const ecommerceSummary = generateEcommerceSummary(pageResults, crawlResult.ecommercePages);
+  const ecommercePages = pageResults
+    .filter(p => ['cart', 'checkout', 'booking', 'product'].includes(p.pageType))
+    .map(p => p.url);
+  const ecommerceSummary = generateEcommerceSummary(pageResults, ecommercePages);
   
   // Step 5: Generate site-wide summary
   const siteWideSummary = generateSiteWideSummary(pageResults);
