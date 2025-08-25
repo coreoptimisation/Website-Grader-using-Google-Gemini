@@ -24,36 +24,11 @@ export interface PerformanceResult {
 }
 
 export async function runPerformanceAudit(url: string): Promise<PerformanceResult> {
-  // Check if we're in development (has the Nix chromium path)
-  const devChromiumPath = '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium';
-  const fs = await import('fs');
-  const useDevPath = fs.existsSync(devChromiumPath);
-  
-  let browser;
-  try {
-    browser = await puppeteer.launch({ 
-      headless: true,
-      ...(useDevPath ? { executablePath: devChromiumPath } : {}),
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
-    });
-  } catch (launchError) {
-    console.error('Failed to launch browser for performance audit:', launchError);
-    // Return fallback scores if browser fails
-    return {
-      score: 50,
-      lighthouseScore: 50,
-      coreWebVitals: {
-        lcp: 2500,
-        fid: 100,
-        cls: 0.1,
-        fcp: 1800,
-        ttfb: 600
-      },
-      opportunities: [],
-      diagnostics: [],
-      metrics: {}
-    };
-  }
+  const browser = await puppeteer.launch({ 
+    headless: true,
+    executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+  });
   
   try {
     const result = await lighthouse(url, {

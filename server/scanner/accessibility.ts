@@ -14,33 +14,11 @@ export interface AccessibilityResult {
 }
 
 export async function runAccessibilityAudit(url: string): Promise<AccessibilityResult> {
-  // Check if we're in development (has the Nix chromium path)
-  const devChromiumPath = '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium';
-  const fs = await import('fs');
-  const useDevPath = fs.existsSync(devChromiumPath);
-  
-  let browser;
-  try {
-    browser = await chromium.launch({ 
-      headless: true,
-      ...(useDevPath ? { executablePath: devChromiumPath } : {}),
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-  } catch (launchError) {
-    console.error('Failed to launch browser for accessibility audit:', launchError);
-    // Return basic scores if browser fails
-    return {
-      score: 0,
-      violations: [],
-      passes: [],
-      incomplete: [],
-      wcagLevel: "Unknown",
-      totalViolations: 0,
-      criticalViolations: 0,
-      moderateViolations: 0,
-      minorViolations: 0
-    };
-  }
+  const browser = await chromium.launch({ 
+    headless: true,
+    executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  });
   
   try {
     const context = await browser.newContext();
