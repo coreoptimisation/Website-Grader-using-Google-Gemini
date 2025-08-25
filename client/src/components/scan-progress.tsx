@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Check, Clock, Loader2, Globe, ShoppingCart, Calendar, Package, Home, AlertCircle, Shield, Gauge, Bot } from "lucide-react";
+import { Check, Clock, Loader2, Globe, AlertCircle } from "lucide-react";
 
 interface ScanProgressProps {
   scanId: string;
@@ -10,64 +11,30 @@ interface ScanProgressProps {
   status?: string;
 }
 
-// Define the stages of a multi-page scan
-const SCAN_STAGES = [
-  { id: 'crawling', label: 'Discovering Pages', description: 'Finding homepage, shop, booking, and content pages' },
-  { id: 'page1', label: 'Homepage Analysis', description: 'Analyzing accessibility, performance, security, and SEO' },
-  { id: 'page2', label: 'Shop/Products Page', description: 'Evaluating e-commerce functionality and user experience' },
-  { id: 'page3', label: 'Booking/Checkout', description: 'Testing transaction flows and security' },
-  { id: 'page4', label: 'Trust/Content Page', description: 'Reviewing policies and trust signals' },
-  { id: 'ai_analysis', label: 'AI Analysis', description: 'Generating insights and recommendations' },
-  { id: 'finalizing', label: 'Finalizing Report', description: 'Compiling results and calculating scores' }
-];
-
-const PILLAR_ICONS = {
-  accessibility: { icon: AlertCircle, color: 'text-blue-600' },
-  performance: { icon: Gauge, color: 'text-purple-600' },
-  security: { icon: Shield, color: 'text-green-600' },
-  seo: { icon: Bot, color: 'text-indigo-600' }
-};
-
 export default function ScanProgress({ scanId, url, status }: ScanProgressProps) {
-  const [currentStage, setCurrentStage] = useState(0);
-  const [currentSubTask, setCurrentSubTask] = useState('Initializing scan...');
-  const [elapsedTime, setElapsedTime] = useState(0);
-  const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState(360); // 6 minutes default
   const [startTime] = useState(Date.now());
+  const [elapsedTime, setElapsedTime] = useState(0);
   
-  // Simulate progress through stages (in production, this would come from backend)
+  // Fetch real progress data from backend
+  const { data: scanData } = useQuery({
+    queryKey: ['/api/scans', scanId],
+    enabled: !!scanId && status === 'scanning',
+    refetchInterval: 1000, // Update every second
+  });
+  
+  const progress = (scanData as any)?.progress;
+  
+  // Update elapsed time
   useEffect(() => {
     if (status !== 'scanning') return;
     
-    const startTime = Date.now();
     const interval = setInterval(() => {
       const elapsed = Math.floor((Date.now() - startTime) / 1000);
       setElapsedTime(elapsed);
-      
-      // Estimate progress based on elapsed time (6 minutes total)
-      const progress = Math.min((elapsed / 360) * 100, 100);
-      const stageIndex = Math.floor((progress / 100) * SCAN_STAGES.length);
-      setCurrentStage(Math.min(stageIndex, SCAN_STAGES.length - 1));
-      
-      // Update estimated time remaining
-      const remaining = Math.max(360 - elapsed, 0);
-      setEstimatedTimeRemaining(remaining);
-      
-      // Set current sub-task based on stage
-      const subTasks = [
-        'Connecting to website...',
-        'Analyzing page structure...',
-        'Running accessibility checks...',
-        'Measuring performance metrics...',
-        'Validating security headers...',
-        'Checking SEO compliance...',
-        'Processing results...'
-      ];
-      setCurrentSubTask(subTasks[stageIndex % subTasks.length]);
     }, 1000);
     
     return () => clearInterval(interval);
-  }, [status]);
+  }, [status, startTime]);
   
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -75,12 +42,21 @@ export default function ScanProgress({ scanId, url, status }: ScanProgressProps)
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
   
-  const overallProgress = Math.min((currentStage / SCAN_STAGES.length) * 100, 100);
+  // Use real progress or default values
+  const currentStage = progress?.stage || 'initializing';
+  const currentPage = progress?.currentPage || 0;
+  const totalPages = progress?.totalPages || 4;
+  const message = progress?.message || 'Starting scan...';
+  const percentage = progress?.percentage || 0;
+  
+  // Estimate remaining time based on progress
+  const estimatedTotal = percentage > 0 ? (elapsedTime / percentage) * 100 : 360;
+  const estimatedRemaining = Math.max(0, Math.round(estimatedTotal - elapsedTime));
   
   if (status !== 'scanning') return null;
 
   return (
-    <Card className="p-6 mb-6 animate-pulse-subtle" data-testid="scan-progress">
+    <Card className="p-6 mb-6" data-testid="scan-progress">
       {/* Header with URL and status */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex-1">
@@ -94,7 +70,7 @@ export default function ScanProgress({ scanId, url, status }: ScanProgressProps)
         </div>
         <Badge variant="default" className="bg-blue-500">
           <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-          Analyzing 4 Pages
+          Scanning {totalPages} Pages
         </Badge>
       </div>
       
@@ -106,17 +82,17 @@ export default function ScanProgress({ scanId, url, status }: ScanProgressProps)
         </div>
         <div>
           <p className="text-xs text-slate-500 mb-1">Est. Time Remaining</p>
-          <p className="text-lg font-semibold text-blue-600">{formatTime(estimatedTimeRemaining)}</p>
+          <p className="text-lg font-semibold text-blue-600">~{formatTime(estimatedRemaining)}</p>
         </div>
         <div>
           <p className="text-xs text-slate-500 mb-1">Overall Progress</p>
-          <p className="text-lg font-semibold">{Math.round(overallProgress)}%</p>
+          <p className="text-lg font-semibold">{percentage}%</p>
         </div>
       </div>
       
       {/* Main Progress Bar */}
       <div className="mb-6">
-        <Progress value={overallProgress} className="h-3" data-testid="progress-bar" />
+        <Progress value={percentage} className="h-3" data-testid="progress-bar" />
       </div>
       
       {/* Current Stage Display */}
@@ -127,89 +103,119 @@ export default function ScanProgress({ scanId, url, status }: ScanProgressProps)
               <Loader2 className="w-4 h-4 animate-spin" />
             </div>
             <div>
-              <p className="font-semibold text-slate-900">
-                {SCAN_STAGES[currentStage]?.label || 'Initializing...'}
+              <p className="font-semibold text-slate-900 capitalize">
+                {currentStage === 'crawling' ? 'Discovering Pages' : 
+                 currentStage === 'scanning' ? `Analyzing Page ${currentPage} of ${totalPages}` :
+                 currentStage === 'finalizing' ? 'Generating Report' :
+                 'Processing...'}
               </p>
               <p className="text-sm text-slate-600">
-                {SCAN_STAGES[currentStage]?.description}
+                {message}
               </p>
             </div>
           </div>
-          <span className="text-sm text-slate-500">
-            Stage {currentStage + 1} of {SCAN_STAGES.length}
-          </span>
+          {currentPage > 0 && currentStage === 'scanning' && (
+            <span className="text-sm text-slate-500">
+              Page {currentPage}/{totalPages}
+            </span>
+          )}
         </div>
-        <p className="text-sm text-blue-700 mt-2 animate-pulse">
-          {currentSubTask}
-        </p>
       </div>
       
-      {/* Stage Timeline */}
+      {/* Stage Progress Indicators */}
       <div className="space-y-3">
         <h4 className="text-sm font-semibold text-slate-700">Analysis Pipeline</h4>
-        <div className="space-y-2">
-          {SCAN_STAGES.map((stage, index) => {
-            const isCompleted = index < currentStage;
-            const isCurrent = index === currentStage;
-            const isPending = index > currentStage;
-            
-            return (
-              <div 
-                key={stage.id} 
-                className={`flex items-center gap-3 p-2 rounded-lg transition-all ${
-                  isCurrent ? 'bg-blue-50 border border-blue-200' : ''
-                }`}
-                data-testid={`stage-${stage.id}`}
-              >
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  isCompleted 
-                    ? 'bg-green-500 text-white' 
-                    : isCurrent
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-slate-200 text-slate-400'
-                }`}>
-                  {isCompleted ? (
-                    <Check className="w-3 h-3" />
-                  ) : isCurrent ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <span className="text-xs">{index + 1}</span>
-                  )}
-                </div>
-                <div className="flex-1">
-                  <p className={`text-sm font-medium ${
-                    isPending ? 'text-slate-400' : 'text-slate-700'
-                  }`}>
-                    {stage.label}
-                  </p>
-                  {isCurrent && (
-                    <div className="flex gap-4 mt-1">
-                      {Object.entries(PILLAR_ICONS).map(([pillar, config]) => (
-                        <div key={pillar} className="flex items-center gap-1">
-                          <config.icon className={`w-3 h-3 ${config.color}`} />
-                          <span className="text-xs text-slate-500 capitalize">{pillar}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {isCompleted && (
-                  <span className="text-xs text-green-600 font-medium">Complete</span>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Crawling Stage */}
+          <div className={`p-3 rounded-lg border ${
+            currentStage === 'crawling' ? 'border-blue-500 bg-blue-50' :
+            currentPage > 0 || currentStage === 'finalizing' ? 'border-green-500 bg-green-50' :
+            'border-slate-200 bg-white'
+          }`}>
+            <div className="flex items-center gap-2">
+              {currentStage === 'crawling' ? (
+                <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+              ) : currentPage > 0 || currentStage === 'finalizing' ? (
+                <Check className="w-4 h-4 text-green-500" />
+              ) : (
+                <Clock className="w-4 h-4 text-slate-400" />
+              )}
+              <span className="text-sm font-medium">Page Discovery</span>
+            </div>
+          </div>
+          
+          {/* Page Scanning Stages */}
+          {[1, 2, 3, 4].map((pageNum) => (
+            <div key={pageNum} className={`p-3 rounded-lg border ${
+              currentStage === 'scanning' && currentPage === pageNum ? 'border-blue-500 bg-blue-50' :
+              currentPage > pageNum || currentStage === 'finalizing' ? 'border-green-500 bg-green-50' :
+              'border-slate-200 bg-white'
+            }`}>
+              <div className="flex items-center gap-2">
+                {currentStage === 'scanning' && currentPage === pageNum ? (
+                  <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+                ) : currentPage > pageNum || currentStage === 'finalizing' ? (
+                  <Check className="w-4 h-4 text-green-500" />
+                ) : (
+                  <Clock className="w-4 h-4 text-slate-400" />
                 )}
-                {isCurrent && (
-                  <span className="text-xs text-blue-600 font-medium animate-pulse">In Progress</span>
-                )}
+                <span className="text-sm font-medium">
+                  {pageNum === 1 ? 'Homepage' :
+                   pageNum === 2 ? 'Shop/Product' :
+                   pageNum === 3 ? 'Booking/Cart' :
+                   'Content Page'}
+                </span>
               </div>
-            );
-          })}
+            </div>
+          ))}
+          
+          {/* Finalizing Stage */}
+          <div className={`p-3 rounded-lg border ${
+            currentStage === 'finalizing' ? 'border-blue-500 bg-blue-50' :
+            'border-slate-200 bg-white'
+          }`}>
+            <div className="flex items-center gap-2">
+              {currentStage === 'finalizing' ? (
+                <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+              ) : (
+                <Clock className="w-4 h-4 text-slate-400" />
+              )}
+              <span className="text-sm font-medium">Final Report</span>
+            </div>
+          </div>
         </div>
       </div>
+      
+      {/* Current Analysis Details */}
+      {currentStage === 'scanning' && currentPage > 0 && (
+        <div className="mt-4 p-3 bg-slate-50 rounded-lg">
+          <p className="text-xs text-slate-600 mb-2">Currently analyzing:</p>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+            <div className="flex items-center gap-1">
+              <AlertCircle className="w-3 h-3 text-blue-600" />
+              <span className="text-xs">Accessibility</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <AlertCircle className="w-3 h-3 text-purple-600" />
+              <span className="text-xs">Performance</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <AlertCircle className="w-3 h-3 text-green-600" />
+              <span className="text-xs">Security</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <AlertCircle className="w-3 h-3 text-indigo-600" />
+              <span className="text-xs">SEO/Agent</span>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Info Footer */}
       <div className="mt-6 pt-4 border-t border-slate-200">
         <p className="text-xs text-slate-500 text-center">
-          Analyzing 4 critical pages across accessibility, performance, security, and SEO pillars.
-          This comprehensive analysis typically takes 5-7 minutes to complete.
+          Comprehensive analysis typically takes 5-7 minutes. We're analyzing {totalPages} critical pages
+          across accessibility, performance, security, and SEO pillars.
         </p>
       </div>
     </Card>

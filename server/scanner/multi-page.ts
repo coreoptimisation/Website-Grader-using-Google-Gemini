@@ -64,6 +64,21 @@ export interface MultiPageScanResult {
   };
 }
 
+// Progress tracking helper
+function updateProgress(scanId: string, stage: string, currentPage: number, totalPages: number, message: string) {
+  const percentage = Math.round((currentPage / (totalPages + 2)) * 100); // +2 for crawling and finalizing stages
+  if ((global as any).scanProgress) {
+    (global as any).scanProgress[scanId] = {
+      stage,
+      currentPage,
+      totalPages,
+      message,
+      percentage,
+      timestamp: Date.now()
+    };
+  }
+}
+
 export async function runMultiPageScan(
   startUrl: string, 
   scanId: string
@@ -71,6 +86,7 @@ export async function runMultiPageScan(
   console.log(`Starting multi-page scan for: ${startUrl}`);
   
   // Step 1: Crawl the website to discover pages
+  updateProgress(scanId, 'crawling', 0, 4, 'Discovering critical pages to analyze...');
   const crawler = new WebCrawler();
   const crawlResult = await crawler.crawl(startUrl);
   
@@ -91,6 +107,13 @@ export async function runMultiPageScan(
     
     console.log(`Scanning page ${i + 1}/${maxPagesToScan}: ${url} (${pageType})`);
     
+    // Update progress for current page
+    const pageTypeLabel = pageType === 'homepage' ? 'Homepage' : 
+                         pageType === 'booking' ? 'Booking/Checkout Page' :
+                         pageType === 'product' ? 'Product/Shop Page' :
+                         pageType === 'cart' ? 'Shopping Cart' : 'Content Page';
+    updateProgress(scanId, 'scanning', i + 1, maxPagesToScan, `Analyzing ${pageTypeLabel}: Running accessibility, performance, security, and SEO checks...`);
+    
     try {
       // Run all scans in parallel for this page
       const [accessibility, performance, security, agentReadiness, screenshot] = await Promise.all([
@@ -104,6 +127,7 @@ export async function runMultiPageScan(
       // Special analysis for ecommerce/booking pages
       let ecommerceAnalysis;
       if (["cart", "checkout", "booking", "product"].includes(pageType)) {
+        updateProgress(scanId, 'scanning', i + 1, maxPagesToScan, `Analyzing ${pageTypeLabel}: Checking booking systems and e-commerce functionality...`);
         ecommerceAnalysis = await analyzeEcommercePage(url, pageType, security, startUrl);
       }
       
@@ -142,6 +166,7 @@ export async function runMultiPageScan(
   }
   
   // Step 3: Calculate aggregate scores
+  updateProgress(scanId, 'finalizing', maxPagesToScan + 1, maxPagesToScan, 'Calculating scores and generating AI insights...');
   const aggregateScores = calculateAggregateScores(pageResults);
   
   // Step 4: Generate ecommerce summary if applicable
@@ -149,6 +174,11 @@ export async function runMultiPageScan(
   
   // Step 5: Generate site-wide summary
   const siteWideSummary = generateSiteWideSummary(pageResults);
+  
+  // Clear progress when done
+  if ((global as any).scanProgress) {
+    delete (global as any).scanProgress[scanId];
+  }
   
   return {
     primaryUrl: startUrl,
