@@ -26,16 +26,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/health", async (req, res) => {
     try {
       const browserHealthy = await browserPool.checkHealth();
+      
+      // Get system info for debugging production issues
+      const memUsage = process.memoryUsage();
+      const uptime = process.uptime();
+      
       res.json({ 
         status: browserHealthy ? "ok" : "degraded",
         browser: browserHealthy ? "available" : "unavailable",
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        system: {
+          memoryUsage: {
+            rss: Math.round(memUsage.rss / 1024 / 1024) + ' MB',
+            heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024) + ' MB',
+            heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024) + ' MB'
+          },
+          uptime: Math.round(uptime) + ' seconds',
+          nodeVersion: process.version,
+          platform: process.platform,
+          environment: process.env.NODE_ENV || 'unknown'
+        }
       });
     } catch (error) {
+      console.error("Health check failed:", error);
       res.status(503).json({ 
         status: "error", 
         browser: "unavailable",
-        message: "Browser health check failed",
+        error: error instanceof Error ? error.message : "Unknown error",
         timestamp: new Date().toISOString()
       });
     }
@@ -130,6 +147,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting scan:", error);
       res.status(500).json({ error: "Failed to delete scan" });
+    }
+  });
+
+  // Debug endpoint to track scan issues on production
+  app.get("/api/debug/scans", async (req, res) => {
+    try {
+      // Get stuck or failed scans
+      const stuckScans = await storage.getScansWithStatus(['scanning', 'pending']);
+      const recentFailedScans = await storage.getRecentFailedScans(5);
+      
+      // Get scan progress info
+      const activeScanProgress = (global as any).scanProgress || {};
+      
+      res.json({
+        timestamp: new Date().toISOString(),
+        stuckScans: stuckScans.map(scan => ({
+          id: scan.id,
+          url: scan.url,
+          status: scan.status,
+          createdAt: scan.created_at,
+          updatedAt: scan.updated_at,
+          minutesStuck: Math.round((Date.now() - new Date(scan.created_at).getTime()) / 1000 / 60)
+        })),
+        recentFailedScans: recentFailedScans.map(scan => ({
+          id: scan.id,
+          url: scan.url,
+          status: scan.status,
+          createdAt: scan.created_at,
+          updatedAt: scan.updated_at
+        })),
+        activeScanProgress: Object.entries(activeScanProgress).map(([scanId, progress]) => ({
+          scanId,
+          progress
+        })),
+        totalActiveScans: Object.keys(activeScanProgress).length
+      });
+    } catch (error) {
+      console.error("Debug scans endpoint failed:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Unknown error",
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
+  // Cleanup endpoint to reset stuck scans (use with caution)
+  app.post("/api/debug/cleanup-stuck-scans", async (req, res) => {
+    try {
+      const stuckScans = await storage.getScansWithStatus(['scanning', 'pending']);
+      const oldScans = stuckScans.filter(scan => 
+        Date.now() - new Date(scan.created_at).getTime() > 600000 // 10 minutes
+      );
+      
+      let cleanedCount = 0;
+      for (const scan of oldScans) {
+        await storage.updateScanStatus(scan.id, "failed");
+        cleanedCount++;
+      }
+      
+      // Clear any stuck progress tracking
+      if ((global as any).scanProgress) {
+        for (const scan of oldScans) {
+          delete (global as any).scanProgress[scan.id];
+        }
+      }
+      
+      res.json({
+        message: `Cleaned up ${cleanedCount} stuck scans`,
+        cleanedScans: oldScans.map(s => ({ id: s.id, url: s.url })),
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Cleanup failed:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Unknown error",
+        timestamp: new Date().toISOString()
+      });
     }
   });
 
