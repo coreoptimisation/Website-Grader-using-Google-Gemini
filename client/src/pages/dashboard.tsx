@@ -17,6 +17,7 @@ import { MultiPageResults } from "@/components/multi-page-results";
 import { aggregateMultiPageData } from "@/lib/aggregate-multi-page-data";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import type { ScanData } from "@/lib/types";
 
@@ -396,18 +397,37 @@ export default function Dashboard() {
                         )}
                         {activeScanId && <ScreenshotViewer scanId={activeScanId} evidence={scanEvidence as any} />}
                         <VisualInsights insights={(activeScanData as any)?.report?.geminiAnalysis?.visualInsights} />
-                        <AccessibilityDetails 
-                          rawData={isMultiPageData ? aggregatedData.accessibility : accessibilityRawData}
-                        />
-                        <TrustSecurityDetails
-                          rawData={isMultiPageData ? aggregatedData.security : trustRawData}
-                        />
-                        <PerformanceDetails
-                          rawData={isMultiPageData ? aggregatedData.performance : performanceRawData}
-                        />
-                        <AgentReadinessDetails
-                          rawData={isMultiPageData ? aggregatedData.agentReadiness : agentRawData}
-                        />
+                        
+                        {/* Detailed Analysis in Tabs */}
+                        <Tabs defaultValue="accessibility" className="w-full">
+                          <TabsList className="grid w-full grid-cols-4">
+                            <TabsTrigger value="accessibility">Accessibility</TabsTrigger>
+                            <TabsTrigger value="trust">Trust & Security</TabsTrigger>
+                            <TabsTrigger value="performance">Performance</TabsTrigger>
+                            <TabsTrigger value="agent">Agent Readiness</TabsTrigger>
+                          </TabsList>
+                          <TabsContent value="accessibility">
+                            <AccessibilityDetails 
+                              rawData={isMultiPageData ? aggregatedData.accessibility : accessibilityRawData}
+                            />
+                          </TabsContent>
+                          <TabsContent value="trust">
+                            <TrustSecurityDetails
+                              rawData={isMultiPageData ? aggregatedData.security : trustRawData}
+                            />
+                          </TabsContent>
+                          <TabsContent value="performance">
+                            <PerformanceDetails
+                              rawData={isMultiPageData ? aggregatedData.performance : performanceRawData}
+                            />
+                          </TabsContent>
+                          <TabsContent value="agent">
+                            <AgentReadinessDetails
+                              rawData={isMultiPageData ? aggregatedData.agentReadiness : agentRawData}
+                            />
+                          </TabsContent>
+                        </Tabs>
+                        
                         <Recommendations report={(activeScanData as any).report} />
                       </>
                     );
