@@ -314,12 +314,12 @@ export default function Dashboard() {
               {/* URL Input Section */}
               <ScanForm onScanStarted={handleScanStarted} />
 
-              {/* Current Scan Progress - Only show when actively scanning */}
-              {activeScanId && isScanning && (
+              {/* Current Scan Progress - Show when scanning or pending */}
+              {activeScanId && (isScanning || isPending) && (
                 <ScanProgress 
                   scanId={activeScanId} 
                   url={(activeScanData as any)?.scan?.url} 
-                  status={(activeScanData as any)?.scan?.status}
+                  status={currentStatus}
                 />
               )}
 
