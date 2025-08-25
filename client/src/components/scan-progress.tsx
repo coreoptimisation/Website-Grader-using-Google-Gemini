@@ -200,8 +200,8 @@ export default function ScanProgress({ scanId, url, status }: ScanProgressProps)
               );
             })
           ) : (
-            // Show placeholder pages during discovery
-            [1, 2, 3, 4].map((pageNum) => (
+            // Show placeholder pages during discovery - use actual total pages
+            Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
               <div key={pageNum} className={`p-3 rounded-lg border ${
                 currentStage === 'scanning' && currentPage === pageNum ? 'border-blue-500 bg-blue-50' :
                 currentPage > pageNum || currentStage === 'finalizing' ? 'border-green-500 bg-green-50' :
