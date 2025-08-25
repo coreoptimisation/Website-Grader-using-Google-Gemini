@@ -11,7 +11,8 @@ import { generateAgentActionBlueprint } from "./scanner/agent-blueprint";
 const scanRequestSchema = z.object({
   url: z.string().url("Invalid URL format"),
   userId: z.string().optional(),
-  multiPage: z.boolean().optional().default(true) // Default to multi-page scanning
+  multiPage: z.boolean().optional().default(true), // Default to multi-page scanning
+  selectedUrls: z.array(z.string().url()).optional() // Optional array of URLs to scan
 });
 
 // Initialize global scan progress tracker
@@ -29,7 +30,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Start a new scan
   app.post("/api/scans", async (req, res) => {
     try {
-      const { url, userId, multiPage } = scanRequestSchema.parse(req.body);
+      const { url, userId, multiPage, selectedUrls } = scanRequestSchema.parse(req.body);
       
       // Create initial scan record
       const scan = await storage.createScan({ url, userId });
@@ -37,7 +38,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ scanId: scan.id, status: "pending" });
       
       // Start scanning process asynchronously
-      processScan(scan.id, url, multiPage).catch(error => {
+      processScan(scan.id, url, multiPage, selectedUrls).catch(error => {
         console.error(`Scan ${scan.id} failed:`, error);
         storage.updateScanStatus(scan.id, "failed");
       });
@@ -122,13 +123,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   return httpServer;
 }
 
-async function processScan(scanId: string, url: string, multiPage: boolean = true) {
+async function processScan(scanId: string, url: string, multiPage: boolean = true, selectedUrls?: string[]) {
   try {
     // Update status to scanning
     await storage.updateScanStatus(scanId, "scanning");
     
     // Run complete scan with screenshot capture
-    const scanResult = await runCompleteScan(url, scanId, multiPage);
+    const scanResult = await runCompleteScan(url, scanId, multiPage, selectedUrls);
     
     // Check if it's a multi-page scan result
     const isMultiPage = 'pageResults' in scanResult;

@@ -15,10 +15,10 @@ export interface ScanEvidence {
   timestamp: Date;
 }
 
-export async function runCompleteScan(url: string, scanId?: string, multiPage: boolean = false): Promise<ScanEvidence | MultiPageScanResult> {
+export async function runCompleteScan(url: string, scanId?: string, multiPage: boolean = false, selectedUrls?: string[]): Promise<ScanEvidence | MultiPageScanResult> {
   if (multiPage && scanId) {
     // Run multi-page scan if requested
-    return await runMultiPageScan(url, scanId);
+    return await runMultiPageScan(url, scanId, selectedUrls);
   }
   
   // Otherwise run single page scan

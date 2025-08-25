@@ -82,33 +82,70 @@ function updateProgress(scanId: string, stage: string, currentPage: number, tota
 
 export async function runMultiPageScan(
   startUrl: string, 
-  scanId: string
+  scanId: string,
+  selectedUrls?: string[]
 ): Promise<MultiPageScanResult> {
   console.log(`Starting multi-page scan for: ${startUrl}`);
   
-  // Step 1: Crawl the website to discover pages
-  updateProgress(scanId, 'crawling', 0, 4, 'Discovering critical pages to analyze...');
-  const crawler = new WebCrawler();
-  const crawlResult = await crawler.crawl(startUrl);
+  let urlsToScan: string[];
+  let discoveredPages: Array<{ url: string; type: string }>;
   
-  console.log(`Discovered ${crawlResult.urls.length} critical pages to analyze:`);
-  crawlResult.discoveredPages.forEach((page, index) => {
-    console.log(`  ${index + 1}. ${page.type.toUpperCase()}: ${page.url}`);
-  });
-  console.log(`Found ecommerce pages:`, crawlResult.ecommercePages);
+  if (selectedUrls && selectedUrls.length > 0) {
+    // Use manually selected URLs
+    console.log(`Using manually selected URLs: ${selectedUrls.length} pages`);
+    urlsToScan = selectedUrls;
+    
+    // Determine page types for selected URLs
+    discoveredPages = urlsToScan.map(url => {
+      // Basic page type detection based on URL patterns
+      const urlLower = url.toLowerCase();
+      let pageType = 'other';
+      
+      if (url === startUrl || url === startUrl + '/' || url === startUrl.replace(/\/$/, '')) {
+        pageType = 'homepage';
+      } else if (urlLower.includes('product') || urlLower.includes('shop') || urlLower.includes('store')) {
+        pageType = 'product';
+      } else if (urlLower.includes('cart') || urlLower.includes('basket')) {
+        pageType = 'cart';
+      } else if (urlLower.includes('checkout') || urlLower.includes('payment')) {
+        pageType = 'checkout';
+      } else if (urlLower.includes('booking') || urlLower.includes('reservation') || urlLower.includes('appointment')) {
+        pageType = 'booking';
+      } else if (urlLower.includes('contact') || urlLower.includes('about')) {
+        pageType = 'contact';
+      }
+      
+      return { url, type: pageType };
+    });
+    
+    updateProgress(scanId, 'scanning', 0, urlsToScan.length, `Preparing to analyze ${urlsToScan.length} selected pages...`);
+  } else {
+    // Use automatic crawling (existing behavior)
+    updateProgress(scanId, 'crawling', 0, 4, 'Discovering critical pages to analyze...');
+    const crawler = new WebCrawler();
+    const crawlResult = await crawler.crawl(startUrl);
+    
+    console.log(`Discovered ${crawlResult.urls.length} critical pages to analyze:`);
+    crawlResult.discoveredPages.forEach((page, index) => {
+      console.log(`  ${index + 1}. ${page.type.toUpperCase()}: ${page.url}`);
+    });
+    
+    urlsToScan = crawlResult.urls.slice(0, 4);
+    discoveredPages = crawlResult.discoveredPages.slice(0, 4);
+  }
   
   // Store discovered pages in progress
   if ((global as any).scanProgress?.[scanId]) {
-    (global as any).scanProgress[scanId].discoveredPages = crawlResult.urls.slice(0, 4);
+    (global as any).scanProgress[scanId].discoveredPages = urlsToScan;
   }
   
-  // Step 2: Scan each critical page (exactly 4 pages)
+  // Step 2: Scan each page
   const pageResults: PageScanResult[] = [];
-  const maxPagesToScan = Math.min(crawlResult.urls.length, 4); // Focus on 4 critical pages: homepage, shop, booking, detail
+  const maxPagesToScan = urlsToScan.length;
   
   for (let i = 0; i < maxPagesToScan; i++) {
-    const url = crawlResult.urls[i];
-    const pageInfo = crawlResult.discoveredPages.find(p => p.url === url);
+    const url = urlsToScan[i];
+    const pageInfo = discoveredPages.find(p => p.url === url);
     const pageType = pageInfo?.type || "other";
     
     console.log(`Scanning page ${i + 1}/${maxPagesToScan}: ${url} (${pageType})`);
@@ -171,7 +208,7 @@ export async function runMultiPageScan(
   }
   
   // Step 3: Calculate aggregate scores
-  updateProgress(scanId, 'finalizing', maxPagesToScan + 1, maxPagesToScan, 'Finishing analysis and compiling final report...');
+  updateProgress(scanId, 'finalizing', maxPagesToScan + 1, maxPagesToScan + 1, 'Finishing analysis and compiling final report...');
   const aggregateScores = calculateAggregateScores(pageResults);
   
   // Step 4: Generate ecommerce summary if applicable
