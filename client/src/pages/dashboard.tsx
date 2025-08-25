@@ -400,11 +400,12 @@ export default function Dashboard() {
                         
                         {/* Detailed Analysis in Tabs */}
                         <Tabs defaultValue="accessibility" className="w-full">
-                          <TabsList className="grid w-full grid-cols-4">
+                          <TabsList className="grid w-full grid-cols-5">
                             <TabsTrigger value="accessibility">Accessibility</TabsTrigger>
                             <TabsTrigger value="trust">Trust & Security</TabsTrigger>
                             <TabsTrigger value="performance">Performance</TabsTrigger>
                             <TabsTrigger value="agent">Agent Readiness</TabsTrigger>
+                            <TabsTrigger value="recommendations">Recommendations</TabsTrigger>
                           </TabsList>
                           <TabsContent value="accessibility">
                             <AccessibilityDetails 
@@ -426,9 +427,10 @@ export default function Dashboard() {
                               rawData={isMultiPageData ? aggregatedData.agentReadiness : agentRawData}
                             />
                           </TabsContent>
+                          <TabsContent value="recommendations">
+                            <Recommendations report={(activeScanData as any).report} />
+                          </TabsContent>
                         </Tabs>
-                        
-                        <Recommendations report={(activeScanData as any).report} />
                       </>
                     );
                   })()}
