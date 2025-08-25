@@ -15,12 +15,15 @@ export interface ScreenshotResult {
 }
 
 export async function captureScreenshot(url: string, scanId: string): Promise<ScreenshotResult> {
-  let page;
+  let context;
   
   try {
     // Use shared browser pool to prevent resource exhaustion
-    page = await browserPool.getPage();
-    await page.setViewportSize({ width: 1920, height: 1080 });
+    const browser = await browserPool.getPlaywrightBrowser();
+    context = await browser.newContext({
+      viewport: { width: 1920, height: 1080 }
+    });
+    const page = await context.newPage();
     
     // Navigate to the page
     await page.goto(url, { 
@@ -82,8 +85,8 @@ export async function captureScreenshot(url: string, scanId: string): Promise<Sc
       }
     };
   } finally {
-    if (page) {
-      await page.close();
+    if (context) {
+      await context.close();
     }
   }
 }
@@ -93,10 +96,12 @@ export async function captureElementScreenshot(
   selector: string, 
   scanId: string
 ): Promise<ScreenshotResult> {
-  const browser = await launchPlaywrightBrowser();
+  let context;
   
   try {
-    const context = await browser.newContext({
+    // Use shared browser pool to prevent resource exhaustion
+    const browser = await browserPool.getPlaywrightBrowser();
+    context = await browser.newContext({
       viewport: { width: 1920, height: 1080 }
     });
     const page = await context.newPage();
@@ -140,7 +145,7 @@ export async function captureElementScreenshot(
     };
     
   } catch (error) {
-    console.error("Element screenshot capture failed:", error);
+    console.error("Element screenshot failed:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
@@ -151,8 +156,8 @@ export async function captureElementScreenshot(
       }
     };
   } finally {
-    if (page) {
-      await page.close();
+    if (context) {
+      await context.close();
     }
   }
 }

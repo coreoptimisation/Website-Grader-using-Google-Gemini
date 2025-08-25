@@ -14,11 +14,14 @@ export interface AccessibilityResult {
 }
 
 export async function runAccessibilityAudit(url: string): Promise<AccessibilityResult> {
+  let context;
   let page;
   
   try {
     // Use shared browser pool to prevent resource exhaustion
-    page = await browserPool.getPage();
+    const browser = await browserPool.getPlaywrightBrowser();
+    context = await browser.newContext();
+    page = await context.newPage();
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
     
     // Run axe-core accessibility audit
@@ -88,8 +91,8 @@ export async function runAccessibilityAudit(url: string): Promise<AccessibilityR
     };
     
   } finally {
-    if (page) {
-      await page.close();
+    if (context) {
+      await context.close();
     }
   }
 }

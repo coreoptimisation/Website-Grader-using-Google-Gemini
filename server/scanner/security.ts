@@ -36,11 +36,14 @@ const POLICY_PATTERNS = {
 };
 
 export async function runSecurityAudit(url: string): Promise<SecurityResult> {
+  let context;
   let page;
   
   try {
     // Use shared browser pool to prevent resource exhaustion
-    page = await browserPool.getPage();
+    const browser = await browserPool.getPlaywrightBrowser();
+    context = await browser.newContext();
+    page = await context.newPage();
     
     // Navigate and capture response headers
     const response = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
@@ -156,8 +159,8 @@ export async function runSecurityAudit(url: string): Promise<SecurityResult> {
     };
     
   } finally {
-    if (page) {
-      await page.close();
+    if (context) {
+      await context.close();
     }
   }
 }

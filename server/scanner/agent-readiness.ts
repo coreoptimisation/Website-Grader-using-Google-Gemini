@@ -42,11 +42,14 @@ export interface AgentReadinessResult {
 
 export async function runAgentReadinessAudit(url: string): Promise<AgentReadinessResult> {
   const baseUrl = new URL(url).origin;
+  let context;
   let page;
   
   try {
     // Use shared browser pool to prevent resource exhaustion
-    page = await browserPool.getPage();
+    const browser = await browserPool.getPlaywrightBrowser();
+    context = await browser.newContext();
+    page = await context.newPage();
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
     
     // Check robots.txt
@@ -90,8 +93,8 @@ export async function runAgentReadinessAudit(url: string): Promise<AgentReadines
     };
     
   } finally {
-    if (page) {
-      await page.close();
+    if (context) {
+      await context.close();
     }
   }
 }
