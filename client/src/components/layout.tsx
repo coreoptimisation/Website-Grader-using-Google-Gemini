@@ -62,26 +62,6 @@ export default function Layout({ children }: LayoutProps) {
                 <span>Scan History</span>
               </button>
             </li>
-            <li>
-              <a 
-                href="#" 
-                className="flex items-center space-x-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100"
-                data-testid="nav-reports"
-              >
-                <FileText className="w-5 h-5" />
-                <span>Reports</span>
-              </a>
-            </li>
-            <li>
-              <a 
-                href="#" 
-                className="flex items-center space-x-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100"
-                data-testid="nav-settings"
-              >
-                <Settings className="w-5 h-5" />
-                <span>Settings</span>
-              </a>
-            </li>
           </ul>
         </nav>
         
