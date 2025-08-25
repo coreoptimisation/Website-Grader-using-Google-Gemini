@@ -21,6 +21,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
+  // Diagnostic endpoint for testing browser
+  app.get("/api/diagnostics", async (req, res) => {
+    const fs = await import('fs');
+    const { chromium } = await import('playwright');
+    
+    const results = {
+      environment: process.env.NODE_ENV || 'unknown',
+      platform: process.platform,
+      nodeVersion: process.version,
+      chromiumPath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
+      pathExists: false,
+      browserTest: false,
+      geminiKeySet: !!process.env.GEMINI_API_KEY,
+      databaseUrlSet: !!process.env.DATABASE_URL,
+      error: null as string | null
+    };
+    
+    // Check if chromium path exists
+    results.pathExists = fs.existsSync(results.chromiumPath);
+    
+    // Try to launch browser
+    try {
+      const browser = await chromium.launch({
+        headless: true,
+        executablePath: results.chromiumPath,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+      });
+      await browser.close();
+      results.browserTest = true;
+    } catch (error: any) {
+      results.error = error.message;
+    }
+    
+    res.json(results);
+  });
+
+  // Test scan endpoint - lightweight scan for testing
+  app.post("/api/test-scan", async (req, res) => {
+    const { url = 'https://example.com' } = req.body;
+    
+    try {
+      const { runAccessibilityAudit } = await import('./scanner/accessibility');
+      const result = await runAccessibilityAudit(url);
+      res.json({ 
+        success: true, 
+        url,
+        accessibilityScore: result.score,
+        violations: result.totalViolations
+      });
+    } catch (error: any) {
+      res.json({ 
+        success: false, 
+        error: error.message,
+        stack: error.stack
+      });
+    }
+  });
+
   // Start a new scan
   app.post("/api/scans", async (req, res) => {
     try {
@@ -111,11 +169,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 }
 
 async function processScan(scanId: string, url: string, multiPage: boolean = true) {
+  console.log(`[SCAN] Starting scan ${scanId} for ${url}`);
+  console.log(`[SCAN] Environment: ${process.env.NODE_ENV}`);
+  console.log(`[SCAN] Multi-page: ${multiPage}`);
+  
   try {
     // Update status to scanning
     await storage.updateScanStatus(scanId, "scanning");
+    console.log(`[SCAN] Status updated to scanning`);
     
     // Run complete scan with screenshot capture
+    console.log(`[SCAN] Running complete scan...`);
     const scanResult = await runCompleteScan(url, scanId, multiPage);
     
     // Check if it's a multi-page scan result

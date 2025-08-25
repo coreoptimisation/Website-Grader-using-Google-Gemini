@@ -14,11 +14,33 @@ export interface AccessibilityResult {
 }
 
 export async function runAccessibilityAudit(url: string): Promise<AccessibilityResult> {
-  const browser = await chromium.launch({ 
-    headless: true,
-    executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
-  });
+  console.log(`[ACCESSIBILITY] Starting audit for ${url}`);
+  console.log(`[ACCESSIBILITY] Environment: ${process.env.NODE_ENV || 'unknown'}`);
+  
+  let browser;
+  try {
+    console.log(`[ACCESSIBILITY] Attempting to launch browser...`);
+    browser = await chromium.launch({ 
+      headless: true,
+      executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    console.log(`[ACCESSIBILITY] Browser launched successfully`);
+  } catch (launchError) {
+    console.error('[ACCESSIBILITY] Browser launch failed:', launchError);
+    // Return fallback scores
+    return {
+      score: 0,
+      violations: [],
+      passes: [],
+      incomplete: [],
+      wcagLevel: "Failed",
+      totalViolations: 0,
+      criticalViolations: 0,
+      moderateViolations: 0,
+      minorViolations: 0
+    };
+  }
   
   try {
     const context = await browser.newContext();
