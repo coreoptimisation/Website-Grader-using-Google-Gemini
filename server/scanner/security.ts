@@ -1,5 +1,6 @@
 import { chromium } from "playwright";
 import { analyzeSSLCertificate, evaluateSSLSecurity } from "./ssl";
+import { getBrowserLaunchOptions } from './browser-utils';
 
 export interface SecurityResult {
   score: number;
@@ -36,10 +37,8 @@ const POLICY_PATTERNS = {
 };
 
 export async function runSecurityAudit(url: string): Promise<SecurityResult> {
-  const browser = await chromium.launch({ 
-    headless: true,
-    executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium'
-  });
+  const launchOptions = getBrowserLaunchOptions();
+  const browser = await chromium.launch(launchOptions);
   
   try {
     const page = await browser.newPage();
