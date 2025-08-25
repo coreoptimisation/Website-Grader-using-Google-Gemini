@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Search, History, FileText, Settings, Menu, X, Plus } from "lucide-react";
+import { Search, History, Menu, X, Plus } from "lucide-react";
 
 interface LayoutProps {
   children: React.ReactNode;
