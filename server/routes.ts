@@ -337,26 +337,30 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
       visualAnalysis = visualInsights;
       
       // Calculate weighted overall score using the shared scoring module
-      overallScore = calculateOverallScore(geminiAnalysis.pillarScores);
+      // For multi-page scans, prefer the aggregate score from the multi-page scanner
+      if (isMultiPage && (scanResult as any).aggregateScores?.overall) {
+        overallScore = (scanResult as any).aggregateScores.overall;
+      } else {
+        overallScore = calculateOverallScore(geminiAnalysis.pillarScores);
+      }
       grade = getGrade(overallScore);
       gradeExplanation = getGradeExplanation(grade, overallScore);
     } catch (geminiError) {
       console.error("Gemini analysis failed, using fallback values:", geminiError);
       
       // Use the actual scores from the scanners as fallback
-      const pillarScoresNumeric = isMultiPage ? {
-        accessibility: (scanResult as any).aggregateScores.accessibility,
-        trust: (scanResult as any).aggregateScores.security,
-        uxPerf: (scanResult as any).aggregateScores.performance,
-        agentReadiness: (scanResult as any).aggregateScores.agentReadiness
-      } : {
-        accessibility: evidence.accessibility.score,
-        trust: evidence.security.score,
-        uxPerf: evidence.performance.score,
-        agentReadiness: evidence.agentReadiness.score
-      };
-      
-      overallScore = calculateOverallScore(pillarScoresNumeric);
+      // For multi-page scans, use the pre-calculated overall score to ensure consistency
+      if (isMultiPage && (scanResult as any).aggregateScores?.overall) {
+        overallScore = (scanResult as any).aggregateScores.overall;
+      } else {
+        const pillarScoresNumeric = {
+          accessibility: evidence.accessibility.score,
+          trust: evidence.security.score,
+          uxPerf: evidence.performance.score,
+          agentReadiness: evidence.agentReadiness.score
+        };
+        overallScore = calculateOverallScore(pillarScoresNumeric);
+      }
       grade = getGrade(overallScore);
       gradeExplanation = getGradeExplanation(grade, overallScore);
       
