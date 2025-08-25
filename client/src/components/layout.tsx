@@ -74,9 +74,9 @@ export default function Layout({ children }: LayoutProps) {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-hidden lg:ml-0">
+      <main className="flex-1 flex flex-col overflow-hidden lg:ml-0">
         {/* Header */}
-        <header className="bg-white border-b border-slate-200 px-4 sm:px-6 py-4 pl-16 lg:pl-6">
+        <header className="bg-white border-b border-slate-200 px-4 sm:px-6 py-4 pl-16 lg:pl-6 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-semibold text-slate-900">Website Analysis Dashboard</h2>
@@ -96,7 +96,7 @@ export default function Layout({ children }: LayoutProps) {
         </header>
 
         {/* Content Area */}
-        <div className="overflow-y-auto h-full">
+        <div className="flex-1 overflow-y-auto">
           {children}
         </div>
       </main>
