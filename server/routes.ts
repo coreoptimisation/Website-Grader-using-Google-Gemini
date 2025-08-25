@@ -182,8 +182,26 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
     console.log(`[SCAN] Running complete scan...`);
     const scanResult = await runCompleteScan(url, scanId, multiPage);
     
-    // Check if it's a multi-page scan result
+    // Check if all scanners failed (indicates domain/connectivity issues)
     const isMultiPage = 'pageResults' in scanResult;
+    if (isMultiPage) {
+      const multiPageResult = scanResult as any;
+      const hasAnySuccessfulScans = multiPageResult.pageResults?.some((page: any) => 
+        page.accessibility?.score > 0 || page.performance?.score > 0 || 
+        page.security?.score > 0 || page.agentReadiness?.score > 0
+      );
+      if (!hasAnySuccessfulScans) {
+        throw new Error(`Failed to access website: ${url}. Please check the URL and try again.`);
+      }
+    } else {
+      const evidence = scanResult as any;
+      if ((!evidence.accessibility || evidence.accessibility.error) &&
+          (!evidence.performance || evidence.performance.error) &&
+          (!evidence.security || evidence.security.error) &&
+          (!evidence.agentReadiness || evidence.agentReadiness.error)) {
+        throw new Error(`Failed to access website: ${url}. Please check the URL and try again.`);
+      }
+    }
     
     // For single-page scan, use the result as evidence
     const evidence = isMultiPage ? null : scanResult;

@@ -47,6 +47,7 @@ export default function Dashboard() {
   
   const isScanning = (activeScanData as any)?.scan?.status === 'scanning';
   const isCompleted = (activeScanData as any)?.scan?.status === 'completed';
+  const isFailed = (activeScanData as any)?.scan?.status === 'failed';
   
   const { data: scanEvidence } = useQuery({
     queryKey: ['/api/scans', activeScanId, 'evidence'],
@@ -85,13 +86,25 @@ export default function Dashboard() {
     }
   };
 
-  // When scan completes, invalidate queries to update the UI
+  // When scan completes or fails, invalidate queries and show notifications
   useEffect(() => {
     if (isCompleted && activeScanId) {
       queryClient.invalidateQueries({ queryKey: ['/api/scans'] });
       queryClient.invalidateQueries({ queryKey: ['/api/scans', activeScanId] });
     }
   }, [isCompleted, activeScanId]);
+
+  useEffect(() => {
+    if (isFailed && activeScanId) {
+      queryClient.invalidateQueries({ queryKey: ['/api/scans'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/scans', activeScanId] });
+      toast({
+        title: "Scan Failed",
+        description: "The website scan failed. Please check the URL and try again.",
+        variant: "destructive"
+      });
+    }
+  }, [isFailed, activeScanId, toast]);
 
   return (
     <div className="min-h-screen flex relative">
