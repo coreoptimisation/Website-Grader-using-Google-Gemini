@@ -14,10 +14,28 @@ export interface AccessibilityResult {
 }
 
 export async function runAccessibilityAudit(url: string): Promise<AccessibilityResult> {
-  const browser = await chromium.launch({ 
-    headless: true,
-    executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium'
-  });
+  let browser;
+  try {
+    // Try to launch browser without hardcoded path (uses Playwright's bundled browser)
+    browser = await chromium.launch({ 
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'] // Required for some production environments
+    });
+  } catch (launchError) {
+    console.error('Failed to launch browser for accessibility audit:', launchError);
+    // Return basic scores if browser fails
+    return {
+      score: 0,
+      violations: [],
+      passes: [],
+      incomplete: [],
+      wcagLevel: "Unknown",
+      totalViolations: 0,
+      criticalViolations: 0,
+      moderateViolations: 0,
+      minorViolations: 0
+    };
+  }
   
   try {
     const context = await browser.newContext();

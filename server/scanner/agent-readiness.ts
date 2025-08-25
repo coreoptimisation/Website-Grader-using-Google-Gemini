@@ -41,10 +41,25 @@ export interface AgentReadinessResult {
 }
 
 export async function runAgentReadinessAudit(url: string): Promise<AgentReadinessResult> {
-  const browser = await chromium.launch({ 
-    headless: true,
-    executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium'
-  });
+  let browser;
+  try {
+    browser = await chromium.launch({ 
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+  } catch (launchError) {
+    console.error('Failed to launch browser for agent readiness audit:', launchError);
+    // Return fallback scores if browser fails
+    return {
+      score: 50,
+      robots: { found: false, valid: false, content: undefined, sitemaps: [] },
+      sitemaps: { found: false, valid: false, count: 0, urls: [] },
+      structuredData: { jsonLd: [], microdata: [], total: 0, types: [], issues: [] },
+      canonical: { present: false, valid: false },
+      hreflang: { present: false, valid: false, languages: [] },
+      meta: { title: false, description: false, ogTags: 0, twitterTags: 0 }
+    };
+  }
   const baseUrl = new URL(url).origin;
   
   try {

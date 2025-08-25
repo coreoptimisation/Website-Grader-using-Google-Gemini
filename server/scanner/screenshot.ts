@@ -15,10 +15,21 @@ export interface ScreenshotResult {
 }
 
 export async function captureScreenshot(url: string, scanId: string): Promise<ScreenshotResult> {
-  const browser = await chromium.launch({ 
-    headless: true,
-    executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium'
-  });
+  let browser;
+  try {
+    browser = await chromium.launch({ 
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+  } catch (launchError) {
+    console.error('Failed to launch browser for screenshot:', launchError);
+    return {
+      success: false,
+      error: 'Browser launch failed',
+      fullPage: false,
+      viewport: { width: 1920, height: 1080 }
+    };
+  }
   
   try {
     const context = await browser.newContext({
@@ -95,10 +106,21 @@ export async function captureElementScreenshot(
   selector: string, 
   scanId: string
 ): Promise<ScreenshotResult> {
-  const browser = await chromium.launch({ 
-    headless: true,
-    executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium'
-  });
+  let browser;
+  try {
+    browser = await chromium.launch({ 
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+  } catch (launchError) {
+    console.error('Failed to launch browser for element screenshot:', launchError);
+    return {
+      success: false,
+      error: 'Browser launch failed',
+      fullPage: false,
+      viewport: { width: 1920, height: 1080 }
+    };
+  }
   
   try {
     const context = await browser.newContext({

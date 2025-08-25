@@ -32,10 +32,20 @@ export class WebCrawler {
       this.domain = url.origin;
       
       // Launch browser
-      this.browser = await chromium.launch({ 
-        headless: true,
-        executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium'
-      });
+      try {
+        this.browser = await chromium.launch({ 
+          headless: true,
+          args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+      } catch (launchError) {
+        console.error('Failed to launch browser for crawling:', launchError);
+        // Return minimal crawl result if browser fails
+        return {
+          urls: [startUrl],
+          ecommercePages: {},
+          discoveredPages: [{ url: startUrl, type: "homepage", priority: 1 }]
+        };
+      }
       
       const result: CrawlResult = {
         urls: [],
