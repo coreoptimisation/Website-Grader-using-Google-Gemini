@@ -95,26 +95,38 @@ export async function runMultiPageScan(
     console.log(`Using manually selected URLs: ${selectedUrls.length} pages`);
     urlsToScan = selectedUrls;
     
-    // Determine page types for selected URLs
+    // Determine page types for selected URLs using comprehensive detection
     discoveredPages = urlsToScan.map(url => {
-      // Basic page type detection based on URL patterns
       const urlLower = url.toLowerCase();
       let pageType = 'other';
       
+      // Homepage detection
       if (url === startUrl || url === startUrl + '/' || url === startUrl.replace(/\/$/, '')) {
         pageType = 'homepage';
-      } else if (urlLower.includes('product') || urlLower.includes('shop') || urlLower.includes('store')) {
-        pageType = 'product';
-      } else if (urlLower.includes('cart') || urlLower.includes('basket')) {
+      }
+      // E-commerce pages
+      else if (urlLower.includes('/cart') || urlLower.includes('/basket') || urlLower.includes('/bag')) {
         pageType = 'cart';
-      } else if (urlLower.includes('checkout') || urlLower.includes('payment')) {
+      }
+      else if (urlLower.includes('/checkout') || urlLower.includes('/payment') || urlLower.includes('/pay')) {
         pageType = 'checkout';
-      } else if (urlLower.includes('booking') || urlLower.includes('reservation') || urlLower.includes('appointment')) {
+      }
+      else if (urlLower.includes('/product') || urlLower.includes('/shop') || urlLower.includes('/store') ||
+               urlLower.includes('/catalog') || urlLower.includes('/merchandise') || urlLower.includes('/buy')) {
+        pageType = 'product';
+      }
+      // Booking/reservation pages - comprehensive detection
+      else if (urlLower.includes('/book') || urlLower.includes('/reservation') || urlLower.includes('/reserve') ||
+               urlLower.includes('/appointment') || urlLower.includes('/booking') || urlLower.includes('/schedule') ||
+               urlLower.includes('/tickets') || urlLower.includes('/register') || urlLower.includes('/enroll')) {
         pageType = 'booking';
-      } else if (urlLower.includes('contact') || urlLower.includes('about')) {
+      }
+      // Contact/about pages
+      else if (urlLower.includes('/contact') || urlLower.includes('/about') || urlLower.includes('/support')) {
         pageType = 'contact';
       }
       
+      console.log(`Detected page type for ${url}: ${pageType}`);
       return { url, type: pageType };
     });
     
