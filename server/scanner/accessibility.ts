@@ -16,19 +16,26 @@ export interface AccessibilityResult {
 export async function runAccessibilityAudit(url: string): Promise<AccessibilityResult> {
   console.log(`[ACCESSIBILITY] Starting audit for ${url}`);
   console.log(`[ACCESSIBILITY] Environment: ${process.env.NODE_ENV || 'unknown'}`);
+  console.log(`[ACCESSIBILITY] Platform: ${process.platform}`);
   
   let browser;
   try {
     console.log(`[ACCESSIBILITY] Attempting to launch browser...`);
-    // Let Playwright find the browser automatically in production
+    
     const launchOptions: any = { 
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
     };
     
-    // Only specify executable path in development
-    if (process.env.NODE_ENV === 'development') {
+    // Use hardcoded path in development, let Playwright handle it in production
+    if (process.env.NODE_ENV !== 'production') {
+      // Development environment with Nix
       launchOptions.executablePath = '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium';
+      console.log(`[ACCESSIBILITY] Using development Chromium path`);
+    } else {
+      // Production - let Playwright use its bundled browser
+      console.log(`[ACCESSIBILITY] Using Playwright bundled browser for production`);
+      // Don't set executablePath - Playwright will use its own
     }
     
     browser = await chromium.launch(launchOptions);
