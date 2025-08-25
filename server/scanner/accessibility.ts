@@ -20,11 +20,18 @@ export async function runAccessibilityAudit(url: string): Promise<AccessibilityR
   let browser;
   try {
     console.log(`[ACCESSIBILITY] Attempting to launch browser...`);
-    browser = await chromium.launch({ 
+    // Let Playwright find the browser automatically in production
+    const launchOptions: any = { 
       headless: true,
-      executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+    };
+    
+    // Only specify executable path in development
+    if (process.env.NODE_ENV === 'development') {
+      launchOptions.executablePath = '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium';
+    }
+    
+    browser = await chromium.launch(launchOptions);
     console.log(`[ACCESSIBILITY] Browser launched successfully`);
   } catch (launchError) {
     console.error('[ACCESSIBILITY] Browser launch failed:', launchError);
