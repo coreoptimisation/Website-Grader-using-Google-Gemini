@@ -101,10 +101,6 @@ export default function Recommendations({ report }: RecommendationsProps) {
             <Download className="w-4 h-4 mr-2" />
             Export PDF
           </Button>
-          <Button size="sm" data-testid="button-view-full-report">
-            <FileText className="w-4 h-4 mr-2" />
-            View Full Report
-          </Button>
         </div>
       </div>
       
