@@ -16,7 +16,10 @@ export interface AccessibilityResult {
 export async function runAccessibilityAudit(url: string): Promise<AccessibilityResult> {
   const browser = await chromium.launch({ 
     headless: true,
-    executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium'
+    // Only use specific executable path in development
+    ...(process.env.NODE_ENV === 'development' && {
+      executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium'
+    })
   });
   
   try {
