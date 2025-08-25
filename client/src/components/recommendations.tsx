@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChevronDown, ChevronRight, Accessibility, Gauge, Shield, Bot, Download, FileText } from "lucide-react";
 import type { ScanReport } from "@/lib/types";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 interface RecommendationsProps {
   report: ScanReport;
@@ -92,22 +94,56 @@ export default function Recommendations({ report }: RecommendationsProps) {
     });
   }
 
-  const handleExportPDF = () => {
-    // Expand all sections for complete PDF export
-    const allPillars = Object.keys(recommendationsByPillar);
-    setExpandedSections(new Set(allPillars));
-    
-    // Expand all recommendations
-    const allRecommendations = Object.values(recommendationsByPillar).flat().map((rec: any) => rec.originalIndex);
-    setExpandedRecommendations(new Set(allRecommendations));
-    
-    // Wait for state update, then print
-    setTimeout(() => {
-      const originalTitle = document.title;
-      document.title = `Website Analysis Report - ${new Date().toLocaleDateString()}`;
-      window.print();
-      document.title = originalTitle;
-    }, 100);
+  const handleExportPDF = async () => {
+    try {
+      // Expand all sections for complete PDF export
+      const allPillars = Object.keys(recommendationsByPillar);
+      setExpandedSections(new Set(allPillars));
+      
+      // Expand all recommendations
+      const allRecommendations = Object.values(recommendationsByPillar).flat().map((rec: any) => rec.originalIndex);
+      setExpandedRecommendations(new Set(allRecommendations));
+      
+      // Wait for state update before capturing
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Find the recommendations card element
+      const element = document.querySelector('[data-testid="detailed-recommendations"]') as HTMLElement;
+      if (!element) return;
+      
+      // Create canvas from element
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true
+      });
+      
+      // Create PDF
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      
+      // Calculate dimensions to fit page
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+      const imgX = (pdfWidth - imgWidth * ratio) / 2;
+      const imgY = 30;
+      
+      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+      
+      // Add header
+      pdf.setFontSize(20);
+      pdf.text('Website Analysis Report', pdfWidth / 2, 20, { align: 'center' });
+      
+      // Save PDF
+      const date = new Date().toLocaleDateString().replace(/\//g, '-');
+      pdf.save(`website-analysis-recommendations-${date}.pdf`);
+      
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+    }
   };
 
   return (
