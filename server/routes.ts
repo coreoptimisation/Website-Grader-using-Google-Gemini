@@ -225,7 +225,7 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
           recommendations: []
         }
       ];
-    } else {
+    } else if (evidence) {
       pillarResults = [
         {
           scanId,
@@ -256,6 +256,9 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
           recommendations: []
         }
       ];
+    } else {
+      // Should not happen, but handle gracefully
+      throw new Error('No scan results available');
     }
 
     // Store pillar results
@@ -309,7 +312,7 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
         if (multiPageResult.pageResults?.[0]?.screenshot?.success) {
           screenshotPath = multiPageResult.pageResults[0].screenshot.filePath;
         }
-      } else {
+      } else if (evidence) {
         // Single-page scan
         if (evidence.screenshot?.success && evidence.screenshot?.filePath) {
           screenshotPath = evidence.screenshot.filePath;
@@ -350,13 +353,26 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
             sitemaps: evidence.agentReadiness.sitemaps?.found || false
           }
         };
+      } else {
+        throw new Error('No evidence available for analysis');
       }
       
-      summarizedEvidence.screenshotPath = screenshotPath;
+      // Add screenshot path to the summarized evidence
+      (summarizedEvidence as any).screenshotPath = screenshotPath;
+      
+      // Prepare evidence for Gemini analysis (remove extra properties)
+      const evidenceForAnalysis = {
+        url: summarizedEvidence.url,
+        accessibility: summarizedEvidence.accessibility,
+        performance: summarizedEvidence.performance,
+        security: summarizedEvidence.security,
+        agentReadiness: summarizedEvidence.agentReadiness,
+        screenshotPath: screenshotPath
+      };
       
       // Run visual analysis in parallel with main analysis
       const [mainAnalysis, visualInsights] = await Promise.all([
-        analyzeWebsiteFindings(summarizedEvidence),
+        analyzeWebsiteFindings(evidenceForAnalysis),
         screenshotPath ? analyzeScreenshot(screenshotPath, summarizedEvidence.url) : Promise.resolve(null)
       ]);
       
@@ -376,11 +392,16 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
         trust: (scanResult as any).aggregateScores.security,
         uxPerf: (scanResult as any).aggregateScores.performance,
         agentReadiness: (scanResult as any).aggregateScores.agentReadiness
-      } : {
+      } : evidence ? {
         accessibility: evidence.accessibility.score,
         trust: evidence.security.score,
         uxPerf: evidence.performance.score,
         agentReadiness: evidence.agentReadiness.score
+      } : {
+        accessibility: 0,
+        trust: 0,
+        uxPerf: 0,
+        agentReadiness: 0
       };
       
       overallScore = calculateOverallScore(pillarScoresNumeric);
@@ -388,11 +409,16 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
       gradeExplanation = getGradeExplanation(grade, overallScore);
       
       // Create fallback analysis with structure matching GeminiAnalysisResult
-      const scores = isMultiPage ? (scanResult as any).aggregateScores : {
+      const scores = isMultiPage ? (scanResult as any).aggregateScores : evidence ? {
         accessibility: evidence.accessibility.score,
         security: evidence.security.score,
         performance: evidence.performance.score,
         agentReadiness: evidence.agentReadiness.score
+      } : {
+        accessibility: 0,
+        security: 0,
+        performance: 0,
+        agentReadiness: 0
       };
       
       const pillarScores = {
@@ -409,12 +435,18 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
         criticalCount: (scanResult as any).siteWideSummary?.criticalIssues || 0,
         automationPotential: 75,
         actions: []
-      } : generateAgentActionBlueprint(
+      } : evidence ? generateAgentActionBlueprint(
         evidence.accessibility,
         evidence.performance,
         evidence.security,
         evidence.agentReadiness
-      );
+      ) : {
+        totalActions: 0,
+        summary: "Unable to generate blueprint",
+        criticalCount: 0,
+        automationPotential: 0,
+        actions: []
+      };
       
       geminiAnalysis = {
         overallScore,
@@ -441,7 +473,7 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
           criticalIssues: isMultiPage ? 
             ((scanResult as any).siteWideSummary?.criticalIssues > 0 ? 
               [`${(scanResult as any).siteWideSummary?.criticalIssues} critical issues found across site`] : []) :
-            (evidence.accessibility.criticalViolations > 0 ? 
+            (evidence?.accessibility?.criticalViolations && evidence.accessibility.criticalViolations > 0 ? 
               [`${evidence.accessibility.criticalViolations} critical accessibility violations found`] : []),
           deadline: "June 28, 2025",
           recommendations: ["Review accessibility scan results for EAA compliance"]

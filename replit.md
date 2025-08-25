@@ -8,6 +8,15 @@ This is an AI-powered website analysis tool that provides comprehensive scoring 
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Updates (August 25, 2025)
+
+### Browser Management Centralization
+- **Implemented Centralized Browser Launcher**: Created `server/scanner/browser-launcher.ts` module following consultant's Option 1 recommendation
+- **Removed Dev/Prod Branching**: Eliminated all conditional browser paths for identical runtime behavior across environments
+- **Playwright Auto-Detection**: Let Playwright manage browser discovery instead of hardcoded paths
+- **Health Check Integration**: Added browser availability check to `/api/health` endpoint for easier production diagnostics
+- **Improved Error Handling**: Scans now return meaningful error messages instead of zero scores when browser launch fails
+
 ## System Architecture
 
 ### Frontend Architecture
@@ -25,11 +34,13 @@ Preferred communication style: Simple, everyday language.
 - **Structured API**: Clear separation between routes, storage, and scanning logic
 
 ### Scanning Engine
+- **Centralized Browser Launcher**: Unified browser management across all scanner modules with automatic detection
 - **Playwright**: Headless browser automation for page interaction and screenshot capture
 - **Axe-core**: Automated accessibility testing with WCAG compliance checking
-- **Lighthouse**: Performance auditing and Core Web Vitals measurement
+- **Lighthouse**: Performance auditing and Core Web Vitals measurement via Puppeteer
 - **Custom Security Scanner**: HTTP header analysis and policy detection
 - **Agent Readiness Checker**: SEO, structured data, and crawlability assessment
+- **Multi-Page Scanner**: Sophisticated 4-page analysis with booking system detection
 
 ### AI Integration
 - **Google Gemini**: AI analysis using the official Google GenAI SDK
