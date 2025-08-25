@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import ScanForm from "@/components/scan-form";
@@ -33,10 +33,12 @@ export default function Dashboard() {
   const isScanning = activeScanData?.scan?.status === 'scanning' || activeScanData?.scan?.status === 'pending';
   const isCompleted = activeScanData?.scan?.status === 'completed';
 
-  // If scan is complete, navigate to the report page
-  if (isCompleted && activeScanId) {
-    navigate(`/scan/${activeScanId}`);
-  }
+  // Navigate to report page when scan is complete
+  useEffect(() => {
+    if (isCompleted && activeScanId) {
+      navigate(`/scan/${activeScanId}`);
+    }
+  }, [isCompleted, activeScanId, navigate]);
 
   return (
     <Layout>
