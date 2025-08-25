@@ -51,7 +51,8 @@ export class WebCrawler {
       const sitemapUrls = await this.parseSitemap(url.origin);
       if (sitemapUrls.length > 0) {
         result.sitemap = sitemapUrls;
-        result.urls = this.prioritizeUrls(sitemapUrls).slice(0, this.maxPages);
+        // Take first maxPages URLs from sitemap
+        result.urls = sitemapUrls.slice(0, this.maxPages);
       }
       
       // Crawl the start page and discover links

@@ -1,5 +1,6 @@
 import { chromium, Browser } from 'playwright';
 import puppeteer from 'puppeteer';
+import { existsSync } from 'fs';
 
 /**
  * Centralized browser launcher for all scanner modules
@@ -11,7 +12,17 @@ export async function launchPlaywrightBrowser(): Promise<Browser> {
     return chromium.connectOverCDP(process.env.BROWSER_WS_ENDPOINT);
   }
 
-  // Let Playwright manage the browser - works everywhere
+  // Check for Nix-installed Chromium (Replit environment)
+  const nixChromiumPath = '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium';
+  if (existsSync(nixChromiumPath)) {
+    return chromium.launch({
+      headless: true,
+      executablePath: nixChromiumPath,
+      args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+    });
+  }
+
+  // Fallback: Let Playwright manage the browser
   return chromium.launch({
     headless: true,
     args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
@@ -22,7 +33,17 @@ export async function launchPlaywrightBrowser(): Promise<Browser> {
  * Launch Puppeteer browser (for Lighthouse)
  */
 export async function launchPuppeteerBrowser() {
-  // Let Puppeteer find its own browser
+  // Check for Nix-installed Chromium (Replit environment)
+  const nixChromiumPath = '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium';
+  if (existsSync(nixChromiumPath)) {
+    return puppeteer.launch({
+      headless: true,
+      executablePath: nixChromiumPath,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+    });
+  }
+  
+  // Fallback: Let Puppeteer find its own browser
   return puppeteer.launch({
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']

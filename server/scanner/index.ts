@@ -35,24 +35,61 @@ export async function runSinglePageScan(url: string, scanId?: string): Promise<S
 
   console.log(`Starting complete scan for: ${url}`);
 
-  // Run all scans in parallel, including screenshot capture
-  const [accessibility, performance, security, agentReadiness, screenshot] = await Promise.all([
-    runAccessibilityAudit(url),
-    runPerformanceAudit(url),
-    runSecurityAudit(url),
-    runAgentReadinessAudit(url),
-    scanId ? captureScreenshot(url, scanId) : Promise.resolve(undefined)
-  ]);
+  try {
+    // Run all scans in parallel, including screenshot capture
+    console.log('Running accessibility audit...');
+    const accessibilityPromise = runAccessibilityAudit(url).catch(err => {
+      console.error('Accessibility audit failed:', err);
+      throw err;
+    });
+    
+    console.log('Running performance audit...');
+    const performancePromise = runPerformanceAudit(url).catch(err => {
+      console.error('Performance audit failed:', err);
+      throw err;
+    });
+    
+    console.log('Running security audit...');
+    const securityPromise = runSecurityAudit(url).catch(err => {
+      console.error('Security audit failed:', err);
+      throw err;
+    });
+    
+    console.log('Running agent readiness audit...');
+    const agentReadinessPromise = runAgentReadinessAudit(url).catch(err => {
+      console.error('Agent readiness audit failed:', err);
+      throw err;
+    });
+    
+    console.log('Capturing screenshot...');
+    const screenshotPromise = scanId ? captureScreenshot(url, scanId).catch(err => {
+      console.error('Screenshot capture failed:', err);
+      throw err;
+    }) : Promise.resolve(undefined);
 
-  return {
-    url,
-    accessibility,
-    performance,
-    security,
-    agentReadiness,
-    screenshot,
-    timestamp: new Date()
-  };
+    const [accessibility, performance, security, agentReadiness, screenshot] = await Promise.all([
+      accessibilityPromise,
+      performancePromise,
+      securityPromise,
+      agentReadinessPromise,
+      screenshotPromise
+    ]);
+
+    console.log('All scans completed successfully');
+
+    return {
+      url,
+      accessibility,
+      performance,
+      security,
+      agentReadiness,
+      screenshot,
+      timestamp: new Date()
+    };
+  } catch (error) {
+    console.error('Scan failed with error:', error);
+    throw error;
+  }
 }
 
 export * from "./accessibility";

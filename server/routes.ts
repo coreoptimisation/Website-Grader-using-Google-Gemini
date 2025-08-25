@@ -139,11 +139,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 async function processScan(scanId: string, url: string, multiPage: boolean = true) {
   try {
+    console.log(`Processing scan ${scanId} for ${url}`);
     // Update status to scanning
     await storage.updateScanStatus(scanId, "scanning");
     
     // Run complete scan with screenshot capture
+    console.log('Running complete scan...');
     const scanResult = await runCompleteScan(url, scanId, multiPage);
+    console.log('Scan completed, processing results...');
     
     // Check if it's a multi-page scan result
     const isMultiPage = 'pageResults' in scanResult;
@@ -262,9 +265,11 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
     }
 
     // Store pillar results
+    console.log('Storing pillar results...');
     await Promise.all(pillarResults.map(result => 
       storage.createScanResult(result)
     ));
+    console.log('Pillar results stored');
 
     // Run Gemini analysis with fallback handling
     let geminiAnalysis;
@@ -492,6 +497,7 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
     }
 
     // Create scan report with visual insights
+    console.log('Creating scan report...');
     await storage.createScanReport({
       scanId,
       overallScore,
@@ -505,9 +511,12 @@ async function processScan(scanId: string, url: string, multiPage: boolean = tru
         visualInsights: visualAnalysis
       }
     });
+    console.log('Scan report created');
 
     // Mark scan as completed
+    console.log('Updating scan status to completed...');
     await storage.updateScanStatus(scanId, "completed", new Date());
+    console.log(`Scan ${scanId} marked as completed successfully`);
 
   } catch (error) {
     console.error(`Scan processing failed for ${scanId}:`, error);
