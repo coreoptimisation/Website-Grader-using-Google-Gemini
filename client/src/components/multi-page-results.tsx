@@ -56,159 +56,32 @@ export function MultiPageResults({ data, evidence, scanId, onPageViewChange }: M
 
   return (
     <div className="space-y-6">
-      {/* Website Header */}
-      <div className="text-center space-y-2 mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Website Analysis Report</h1>
-        <div className="flex items-center justify-center gap-2 text-lg sm:text-xl text-blue-600">
-          <Globe className="h-5 w-5" />
-          <span className="font-semibold break-all">{data.primaryUrl}</span>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="p-1 h-auto"
-            onClick={() => window.open(data.primaryUrl, '_blank')}
-          >
-            <ExternalLink className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Multi-Page Analysis Header */}
-      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
-        <CardHeader className="p-4 sm:p-6">
-          <div className="flex items-center gap-2">
-            <Globe className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
-            <CardTitle className="text-base sm:text-lg text-blue-900">Multi-Page Analysis Results</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent className="p-4 sm:p-6">
-          <p className="text-xs sm:text-sm text-blue-800">
-            Analyzed {data.pagesAnalyzed} pages across your website, including homepage, product pages, and checkout/booking functionality.
-            The scores below represent weighted averages across all analyzed pages.
-          </p>
-        </CardContent>
-      </Card>
       
-      {/* Overview Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Multi-Page Analysis Overview</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Pages Analyzed</p>
-              <p className="text-2xl font-bold">{data.pagesAnalyzed}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Overall Score</p>
-              <p className={`text-2xl font-bold ${getScoreColor(data.aggregateScores?.overall || 0)}`}>
-                {data.aggregateScores?.overall || 0}%
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Critical Issues</p>
-              <p className="text-2xl font-bold text-red-600">
-                {data.siteWideSummary?.criticalIssues || 0}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total Issues</p>
-              <p className="text-2xl font-bold">
-                {data.siteWideSummary?.totalIssues || 0}
-              </p>
-            </div>
-          </div>
-
-          {/* Aggregate Scores */}
-          <div className="mt-6 space-y-3">
-            <h4 className="font-semibold">Site-Wide Scores</h4>
-            {data.aggregateScores && Object.entries(data.aggregateScores)
-              .filter(([key]) => key !== "overall")
-              .map(([pillar, score]) => (
-                <div key={pillar} className="flex items-center justify-between">
-                  <span className="capitalize">{pillar.replace(/([A-Z])/g, ' $1').trim()}</span>
-                  <div className="flex items-center gap-2">
-                    <Progress value={score as number} className="w-24 h-2" />
-                    <span className={`font-medium ${getScoreColor(score as number)}`}>
-                      {score}%
-                    </span>
-                  </div>
-                </div>
-              ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* E-commerce/Booking Analysis */}
-      {data.ecommerceSummary && (
-        <Card>
-          <CardHeader>
-            <CardTitle>E-commerce & Booking Analysis</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex gap-4">
-                {data.ecommerceSummary.hasEcommerce && (
-                  <Badge variant="default" className="flex items-center gap-1">
-                    <ShoppingCart className="h-3 w-3" />
-                    E-commerce Detected
-                  </Badge>
-                )}
-                {data.ecommerceSummary.hasBooking && (
-                  <Badge variant="default" className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    Booking System Detected
-                  </Badge>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Functionality Score</p>
-                  <p className={`text-xl font-bold ${getScoreColor(data.ecommerceSummary.functionalityScore)}`}>
-                    {data.ecommerceSummary.functionalityScore}%
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Security Score</p>
-                  <p className={`text-xl font-bold ${getScoreColor(data.ecommerceSummary.securityScore)}`}>
-                    {data.ecommerceSummary.securityScore}%
-                  </p>
-                </div>
-              </div>
-
-              {data.ecommerceSummary.criticalIssues?.length > 0 && (
-                <div>
-                  <h5 className="font-medium text-red-600 mb-2">Critical Issues</h5>
-                  <ul className="space-y-1">
-                    {data.ecommerceSummary.criticalIssues.map((issue: string, index: number) => (
-                      <li key={index} className="flex items-start gap-2 text-sm">
-                        <XCircle className="h-4 w-4 text-red-500 mt-0.5" />
-                        {issue}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {data.ecommerceSummary.recommendations?.length > 0 && (
-                <div>
-                  <h5 className="font-medium mb-2">Recommendations</h5>
-                  <ul className="space-y-1">
-                    {data.ecommerceSummary.recommendations.map((rec: string, index: number) => (
-                      <li key={index} className="flex items-start gap-2 text-sm">
-                        <AlertCircle className="h-4 w-4 text-yellow-500 mt-0.5" />
-                        {rec}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          </CardContent>
+      {/* Summary Statistics */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="p-4">
+          <p className="text-sm text-muted-foreground mb-1">Pages Analyzed</p>
+          <p className="text-2xl font-bold">{data.pagesAnalyzed}</p>
         </Card>
-      )}
+        <Card className="p-4">
+          <p className="text-sm text-muted-foreground mb-1">Overall Score</p>
+          <p className={`text-2xl font-bold ${getScoreColor(data.aggregateScores?.overall || 0)}`}>
+            {data.aggregateScores?.overall || 0}%
+          </p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-sm text-muted-foreground mb-1">Critical Issues</p>
+          <p className="text-2xl font-bold text-red-600">
+            {data.siteWideSummary?.criticalIssues || 0}
+          </p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-sm text-muted-foreground mb-1">Total Issues</p>
+          <p className="text-2xl font-bold">
+            {data.siteWideSummary?.totalIssues || 0}
+          </p>
+        </Card>
+      </div>
 
       {/* Quick Access to Individual Pages */}
       <Card>

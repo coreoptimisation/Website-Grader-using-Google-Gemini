@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Search, Plus, History, FileText, Settings, SearchCode, Trash2, Menu, X } from "lucide-react";
+import { Search, Plus, History, FileText, Settings, SearchCode, Trash2, Menu, X, Globe, ExternalLink } from "lucide-react";
 import ScanForm from "@/components/scan-form";
 import ScanProgress from "@/components/scan-progress";
 import PillarScores from "@/components/pillar-scores";
@@ -324,6 +324,23 @@ export default function Dashboard() {
               {/* Results Dashboard */}
               {isCompleted && activeScanData && (
                 <>
+                  {/* Website Header - Always show at the top */}
+                  <div className="text-center space-y-2 mb-6">
+                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Website Analysis Report</h1>
+                    <div className="flex items-center justify-center gap-2 text-lg sm:text-xl text-blue-600">
+                      <Globe className="h-5 w-5" />
+                      <span className="font-semibold break-all">{(activeScanData as any)?.scan?.url}</span>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="p-1 h-auto"
+                        onClick={() => window.open((activeScanData as any)?.scan?.url, '_blank')}
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
                   {/* Show Overall Grade and PillarScores first for multi-page scans (when not viewing individual page) */}
                   {!isViewingIndividualPage && (() => {
                     const multiPageData = Array.isArray(scanEvidence) ? scanEvidence?.find((e: any) => e.type === 'multi_page_scan')?.data : null;
